@@ -60,9 +60,9 @@ main (int argc, char *argv[])
 		 LogComponentEnable ("topo", LOG_LEVEL_INFO);
 		}
 
-		int number_of_ToR_sw = 2;
-	  int number_of_sw = 2;
-		int number_of_VM = 2;
+		int number_of_ToR_sw = 100;
+	  int number_of_sw = 4;
+		int number_of_VM = 20;
 
 		std::chrono::steady_clock::time_point begin;
 		std::chrono::steady_clock::time_point end;
@@ -82,17 +82,23 @@ main (int argc, char *argv[])
 		NodeContainer vm_nodes;
 		vm_nodes.Create (number_of_VM*number_of_sw*number_of_ToR_sw);
 
-		NodeContainer net_sw(sw_nodes.Get(0 )) ; //net_sw is a container for all sw in the network, used to set their position on a grid.
+		NodeContainer net_ToR_sw(ToR_sw_nodes.Get(0)) ; //net_ToR_sw is a container for all ToR sw in the network, used to set their position on a grid.
+		for(int i = 1;i<number_of_ToR_sw;i++)
+		{
+			net_ToR_sw.Add(ToR_sw_nodes.Get(i));
+		};
+
+		NodeContainer net_sw(sw_nodes.Get(0)) ; //net_sw is a container for all sw in the network, used to set their position on a grid.
 		for(int i = 1;i<number_of_sw*number_of_ToR_sw;i++)
 		{
 			net_sw.Add(sw_nodes.Get(i));
 		};
 
-		// NodeContainer net_vm(sw_nodes.Get(0 )) ; //net_sw is a container for all sw in the network, used to set their position on a grid.
-		// for(int i = 1;i<number_of_sw*number_of_ToR_sw;i++)
-		// {
-		// 	net_sw.Add(sw_nodes.Get(i));
-		// };
+		NodeContainer net_vm(vm_nodes.Get(0 )) ; //net_vm is a container for all vm in the network, used to set their position on a grid.
+		for(int i = 1;i<number_of_sw*number_of_ToR_sw*number_of_VM;i++)
+		{
+			net_vm.Add(vm_nodes.Get(i));
+		};
 
 		//Create node containers, to group nodes -- > sw and ToR_sw
 		std::vector<NodeContainer> net_sw_ToRsw;
@@ -105,22 +111,35 @@ main (int argc, char *argv[])
 				}
 			}
 
+		//Create node containers, to group nodes -- > vm and sw
+		std::vector<NodeContainer> net_vm_sw;
+		for(int i=0;i<number_of_sw*number_of_ToR_sw;i++)
+			{
+				for(int j = 0;j<number_of_VM;j++)
+				{
+							// NS_LOG_ERROR("sw "<<i);
+						  // NS_LOG_ERROR("vm "<<(i*number_of_VM) +j);
+							// NS_LOG_ERROR("   ");
+				NodeContainer net2 (vm_nodes.Get((i*number_of_VM) +j), sw_nodes.Get(i));
+				net_vm_sw.insert(net_vm_sw.end(), net2);
+				}
+			}
+
 		end= std::chrono::steady_clock::now();
 		NS_LOG_ERROR("Time required for node creation = " << std::chrono::duration_cast<std::chrono::nanoseconds>(end - begin).count() <<" NanoSec");
 		begin = std::chrono::steady_clock::now();
 
 		//each nodecontainer of vector netvm has all the vms connected to one sw. - total number_of_ToR_sw*number_of_sw netcontainers
-		std::vector<NodeContainer>netvm;
-
-		for(int i = 0; i<number_of_sw*number_of_ToR_sw; i++)
-		{
-			NodeContainer net3(vm_nodes.Get(i*number_of_VM )) ;
-			for(int j = 1;j<number_of_VM;j++)
-			{
-			net3.Add(vm_nodes.Get(i*number_of_VM +j));
-			}
-			netvm.insert(netvm.end(), net3);
-		}
+		// std::vector<NodeContainer>netvm;
+		// for(int i = 0; i<number_of_sw*number_of_ToR_sw; i++)
+		// {
+		// 	NodeContainer net3(vm_nodes.Get(i*number_of_VM )) ;
+		// 	for(int j = 1;j<number_of_VM;j++)
+		// 	{
+		// 	net3.Add(vm_nodes.Get(i*number_of_VM +j));
+		// 	}
+		// 	netvm.insert(netvm.end(), net3);
+		// }
 			end= std::chrono::steady_clock::now();
 			NS_LOG_ERROR("Time required for node containers = " << std::chrono::duration_cast<std::chrono::nanoseconds>(end - begin).count() <<" NanoSec");
 
@@ -130,7 +149,7 @@ main (int argc, char *argv[])
 	DoubleValue rate (errRate);
 	Ptr<RateErrorModel> em1 =
 	CreateObjectWithAttributes<RateErrorModel> ("RanVar", StringValue ("ns3::UniformRandomVariable[Min=0.0|Max=1.0]"), "ErrorRate", rate);
-	  //create channels
+	  //create p2p channels
 	NS_LOG_INFO ("Create p2p channels.");
 	PointToPointHelper p2p;
 	p2p.SetDeviceAttribute ("DataRate", StringValue ("4000Mbps"));
@@ -146,7 +165,17 @@ main (int argc, char *argv[])
 	  }
 	end= std::chrono::steady_clock::now();
 	NS_LOG_ERROR("Time required for P2P install = " << std::chrono::duration_cast<std::chrono::nanoseconds>(end - begin).count() <<" NanoSec");
-
+	
+	std::vector<NetDeviceContainer> ndc_vm_sw;
+	for(int i = 0;i<number_of_sw*number_of_ToR_sw*number_of_VM;i++)
+	  {
+	  NetDeviceContainer ndc2 = p2p.Install (net_vm_sw[i]); //switch and ToR_switch
+		//			NS_LOG_ERROR("problem here2  "<<i);
+	  ndc_vm_sw.insert(ndc_vm_sw.end(), ndc2);
+	  ndc2.Get(0)->SetAttribute ("ReceiveErrorModel", PointerValue (em1));
+	  ndc2.Get(1)->SetAttribute ("ReceiveErrorModel", PointerValue (em1));
+	  }
+			//NS_LOG_ERROR("problem here");
 
 	begin = std::chrono::steady_clock::now();
     //create wifi channel
@@ -174,8 +203,8 @@ main (int argc, char *argv[])
 						mac.SetType ("ns3::StaWifiMac",
 													"Ssid", SsidValue (ssid),
 													"ActiveProbing", BooleanValue (false));
-						NetDeviceContainer ndc3 = wifi.Install (phy, mac,netvm[(i*number_of_sw) +j]);//all sta connected to ap j of sw i
-						ndc_sta.insert(ndc_sta.end(), ndc3);
+						//NetDeviceContainer ndc3 = wifi.Install (phy, mac,netvm[(i*number_of_sw) +j]);//all sta connected to ap j of sw i
+						//ndc_sta.insert(ndc_sta.end(), ndc3);
 						mac.SetType ("ns3::ApWifiMac",
 													"Ssid", SsidValue (ssid));
 						NetDeviceContainer ndc4 = wifi.Install (phy, mac, sw_nodes.Get((i*number_of_sw) +j));
@@ -191,46 +220,72 @@ main (int argc, char *argv[])
 
 		//***********************************************  Set position of wireless nodes **************************************
 			 	 begin = std::chrono::steady_clock::now();
+			MobilityHelper mobility_ToR;
+			mobility_ToR.SetPositionAllocator ("ns3::GridPositionAllocator",
+																			"MinX", DoubleValue (20.0),
+																			"MinY", DoubleValue (-50.0),
+																			"DeltaX", DoubleValue (60.0),
+																			"DeltaY", DoubleValue (10.0),
+																			"GridWidth", UintegerValue (100),
+																			"LayoutType", StringValue ("RowFirst"));
+			mobility_ToR.SetMobilityModel ("ns3::ConstantPositionMobilityModel");
+			mobility_ToR.Install (net_ToR_sw);	
 
-		MobilityHelper mobility;
-		MobilityHelper mobility1;
-		mobility1.SetPositionAllocator ("ns3::GridPositionAllocator",
-																		"MinX", DoubleValue (5.0),
-																		"MinY", DoubleValue (0.0),
-																		"DeltaX", DoubleValue (5.0),
+			MobilityHelper mobility_sw;
+			mobility_sw.SetPositionAllocator ("ns3::GridPositionAllocator",
+																			"MinX", DoubleValue (-5.0),
+																			"MinY", DoubleValue (-10.0),
+																			"DeltaX", DoubleValue (15.0),
+																			"DeltaY", DoubleValue (10.0),
+																			"GridWidth", UintegerValue (1000),
+																			"LayoutType", StringValue ("RowFirst"));
+			mobility_sw.SetMobilityModel ("ns3::ConstantPositionMobilityModel");
+			mobility_sw.Install (net_sw);
+
+		MobilityHelper mobility_vm;
+		mobility_vm.SetPositionAllocator ("ns3::GridPositionAllocator",
+																		"MinX", DoubleValue (-10.0),
+																		"MinY", DoubleValue (1.00),
+																		"DeltaX", DoubleValue (8.0),
 																		"DeltaY", DoubleValue (5.0),
-																		"GridWidth", UintegerValue (3),
-																		"LayoutType", StringValue ("RowFirst"));
-		mobility1.SetMobilityModel ("ns3::ConstantPositionMobilityModel");
+																		"GridWidth", UintegerValue (10),
+																		//"LayoutType", StringValue ("RowFirst"));
+																		"LayoutType", StringValue ("ColumnFirst"));
+		mobility_vm.SetMobilityModel ("ns3::ConstantPositionMobilityModel");
+		//for (int i = 0; i < number_of_sw*number_of_ToR_sw*number_of_VM; ++i)
+    //{
+		//NS_LOG_INFO("Problem is here"<<i);
+		mobility_vm.Install(net_vm);
+		//}	
 
-		mobility1.Install (net_sw); //put ap on a grid
+
+		//mobility1.Install (net_sw); //put ap on a grid
 
 
-		for (int i = 0; i < number_of_sw*number_of_ToR_sw; ++i)
-    {
-		Ptr<ListPositionAllocator> WifiStaPosition = CreateObject<ListPositionAllocator> ();
-		Ptr<MobilityModel> ap_mobility = net_sw.Get(i)->GetObject<MobilityModel> ();
-			Vector pos = ap_mobility->GetPosition();
-		for(int j=0;j<number_of_VM;j++)
-		{
-      int v1 = ((rand() % 61)-30)+(pos.x) + 200;
-      int v2 = ((rand() % 61)-30)+(pos.y);
-       if (pow(v1-pos.x-200,2)+pow(v2-pos.y,2)<=pow(30,2))
-         WifiStaPosition->Add (Vector(v1, v2, 0));
-       else
-         j--;
-		}
-     // std::cout << " sta1 location1: " << v1-50<< "sta1 location2: "<<v2-30<<" \n";//added
-      mobility.SetPositionAllocator(WifiStaPosition);
-  mobility1.Install(netvm[i]);
-    }
+	// 	for (int i = 0; i < number_of_sw*number_of_ToR_sw; ++i)
+  //   {
+	// 	Ptr<ListPositionAllocator> WifiStaPosition = CreateObject<ListPositionAllocator> ();
+	// 	Ptr<MobilityModel> ap_mobility = net_sw.Get(i)->GetObject<MobilityModel> ();
+	// 		Vector pos = ap_mobility->GetPosition();
+	// 	for(int j=0;j<number_of_VM;j++)
+	// 	{
+  //     int v1 = ((rand() % 61)-30)+(pos.x) + 200;
+  //     int v2 = ((rand() % 61)-30)+(pos.y);
+  //      if (pow(v1-pos.x-200,2)+pow(v2-pos.y,2)<=pow(30,2))
+  //        WifiStaPosition->Add (Vector(v1, v2, 0));
+  //      else
+  //        j--;
+	// 	}
+  //    // std::cout << " sta1 location1: " << v1-50<< "sta1 location2: "<<v2-30<<" \n";//added
+  //     mobility.SetPositionAllocator(WifiStaPosition);
+  // mobility1.Install(netvm[i]);
+  //   }
 		end= std::chrono::steady_clock::now();
-		std::cout << "Time required for positioning of wireless nodes = " << std::chrono::duration_cast<std::chrono::nanoseconds>(end - begin).count() <<" NanoSec"<<std::endl;
+		std::cout << "Time required for positioning of nodes = " << std::chrono::duration_cast<std::chrono::nanoseconds>(end - begin).count() <<" NanoSec"<<std::endl;
 
 		//*********************************************** IP Stack **************************************
 				begin = std::chrono::steady_clock::now();
 
-		NS_LOG_INFO ("Added ip stack.");
 		InternetStackHelper stack;
 		for(int i = 0;i<number_of_sw*number_of_ToR_sw;i++)
 		{
@@ -245,10 +300,11 @@ main (int argc, char *argv[])
 		{
 			stack.Install (vm_nodes.Get(i));
 		}
+		NS_LOG_INFO ("Added ip stack.");
 
 	//	stack.Install (gw);
 
-		NS_LOG_INFO ("Assign IPv4 Addresses.");
+		NS_LOG_INFO ("Assigning IPv4 Addresses.");
 		Ipv4AddressHelper ipv4;
 
 		ipv4.SetBase (Ipv4Address ("10.0.0.0"), Ipv4Mask ("255.255.0.0"));
@@ -298,8 +354,8 @@ main (int argc, char *argv[])
 
 			const char * c = d.c_str();
 			ipv4.SetBase (Ipv4Address (c), Ipv4Mask ("255.255.255.0"));
-			Ipv4InterfaceContainer iic4 = ipv4.Assign (ndc_ap_sta[i]);               //AP
-			Ipv4InterfaceContainer iic3 = ipv4.Assign (ndc_sta[i]);                  //Sta
+		//	Ipv4InterfaceContainer iic4 = ipv4.Assign (ndc_ap_sta[i]);               //AP
+		// /	Ipv4InterfaceContainer iic3 = ipv4.Assign (ndc_sta[i]);                  //Sta
 		}
 
 				end= std::chrono::steady_clock::now();
