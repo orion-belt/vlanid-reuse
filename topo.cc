@@ -74,13 +74,17 @@ main (int argc, char *argv[])
 		NodeContainer ToR_sw_nodes;
 		ToR_sw_nodes.Create (number_of_ToR_sw);
 
-		//create SW nodes - create "number_of_sw * number_of_ToR_sw" nodes for each switch
+		//create SW nodes - create "number_of_	sw * number_of_ToR_sw" nodes for each switch
 		NodeContainer sw_nodes;
 		sw_nodes.Create (number_of_sw*number_of_ToR_sw);
 
 		//Create vm node - create "number_of_VM * number_of_sw * number_of_ToR_sw" nodes for each switch
 		NodeContainer vm_nodes;
 		vm_nodes.Create (number_of_VM*number_of_sw*number_of_ToR_sw);
+
+		//Create gw node 
+		NodeContainer gw;
+		gw.Create (1);
 
 		NodeContainer net_ToR_sw(ToR_sw_nodes.Get(0)) ; //net_ToR_sw is a container for all ToR sw in the network, used to set their position on a grid.
 		for(int i = 1;i<number_of_ToR_sw;i++)
@@ -100,8 +104,7 @@ main (int argc, char *argv[])
 			net_vm.Add(vm_nodes.Get(i));
 		};
 
-		//Create node containers, to group nodes -- > sw and ToR_sw
-		std::vector<NodeContainer> net_sw_ToRsw;
+		std::vector<NodeContainer> net_sw_ToRsw; //net_sw_ToRsw is a container, to group nodes -- > sw and ToR_sw
 		for(int i=0;i<number_of_ToR_sw;i++)
 			{
 				for(int j = 0;j<number_of_sw;j++)
@@ -111,18 +114,24 @@ main (int argc, char *argv[])
 				}
 			}
 
-		//Create node containers, to group nodes -- > vm and sw
-		std::vector<NodeContainer> net_vm_sw;
+		std::vector<NodeContainer> net_vm_sw; //net_vm_sw is a container, to group nodes -- > vm and sw
 		for(int i=0;i<number_of_sw*number_of_ToR_sw;i++)
 			{
 				for(int j = 0;j<number_of_VM;j++)
 				{
-							// NS_LOG_ERROR("sw "<<i);
-						  // NS_LOG_ERROR("vm "<<(i*number_of_VM) +j);
-							// NS_LOG_ERROR("   ");
 				NodeContainer net2 (vm_nodes.Get((i*number_of_VM) +j), sw_nodes.Get(i));
 				net_vm_sw.insert(net_vm_sw.end(), net2);
 				}
+			}
+
+		std::vector<NodeContainer> net_ToRsw_gw; //net_vm_sw is a container, to group nodes -- > vm and sw
+		for(int i=0;i<number_of_ToR_sw;i++)
+			{
+				// for(int j = 0;j<number_of_VM;j++)
+				// {
+				NodeContainer net_gw (gw.Get(0), ToR_sw_nodes.Get(i));
+				net_ToRsw_gw.insert(net_ToRsw_gw.end(), net_gw);
+				// }
 			}
 
 		end= std::chrono::steady_clock::now();
@@ -154,6 +163,7 @@ main (int argc, char *argv[])
 	PointToPointHelper p2p;
 	p2p.SetDeviceAttribute ("DataRate", StringValue ("4000Mbps"));
 	p2p.SetChannelAttribute ("Delay", StringValue ("2ms"));
+
 	// There are a total of number_of_sw*number_of_sw APs, so there are a total of number_of_sw*number_of_sw netdevice containers
 	std::vector<NetDeviceContainer> ndc_sw_ToRsw;
 	for(int i = 0;i<number_of_sw*number_of_ToR_sw;i++)
@@ -163,19 +173,26 @@ main (int argc, char *argv[])
 	  ndc1.Get(0)->SetAttribute ("ReceiveErrorModel", PointerValue (em1));
 	  ndc1.Get(1)->SetAttribute ("ReceiveErrorModel", PointerValue (em1));
 	  }
-	end= std::chrono::steady_clock::now();
-	NS_LOG_ERROR("Time required for P2P install = " << std::chrono::duration_cast<std::chrono::nanoseconds>(end - begin).count() <<" NanoSec");
 	
 	std::vector<NetDeviceContainer> ndc_vm_sw;
 	for(int i = 0;i<number_of_sw*number_of_ToR_sw*number_of_VM;i++)
 	  {
-	  NetDeviceContainer ndc2 = p2p.Install (net_vm_sw[i]); //switch and ToR_switch
-		//			NS_LOG_ERROR("problem here2  "<<i);
+	  NetDeviceContainer ndc2 = p2p.Install (net_vm_sw[i]); //vm and switch
 	  ndc_vm_sw.insert(ndc_vm_sw.end(), ndc2);
 	  ndc2.Get(0)->SetAttribute ("ReceiveErrorModel", PointerValue (em1));
 	  ndc2.Get(1)->SetAttribute ("ReceiveErrorModel", PointerValue (em1));
 	  }
-			//NS_LOG_ERROR("problem here");
+
+	std::vector<NetDeviceContainer> ndc_sw_gw;
+	for(int i = 0;i<number_of_ToR_sw;i++)
+	  {
+	  NetDeviceContainer ndc3 = p2p.Install (net_ToRsw_gw[i]); //vm and switch
+	  ndc_sw_gw.insert(ndc_sw_gw.end(), ndc3);
+	  ndc3.Get(0)->SetAttribute ("ReceiveErrorModel", PointerValue (em1));
+	  ndc3.Get(1)->SetAttribute ("ReceiveErrorModel", PointerValue (em1));
+	  }	
+	end= std::chrono::steady_clock::now();
+	NS_LOG_ERROR("Time required for P2P install = " << std::chrono::duration_cast<std::chrono::nanoseconds>(end - begin).count() <<" NanoSec");
 
 	begin = std::chrono::steady_clock::now();
     //create wifi channel
@@ -220,11 +237,23 @@ main (int argc, char *argv[])
 
 		//***********************************************  Set position of wireless nodes **************************************
 			 	 begin = std::chrono::steady_clock::now();
+
+			MobilityHelper mobility_gw;
+			mobility_gw.SetPositionAllocator ("ns3::GridPositionAllocator",
+																			"MinX", DoubleValue (4000.0),
+																			"MinY", DoubleValue (-500.0),
+																			"DeltaX", DoubleValue (80.0),
+																			"DeltaY", DoubleValue (10.0),
+																			"GridWidth", UintegerValue (100),
+																			"LayoutType", StringValue ("RowFirst"));
+			mobility_gw.SetMobilityModel ("ns3::ConstantPositionMobilityModel");
+			mobility_gw.Install (gw);	
+		
 			MobilityHelper mobility_ToR;
 			mobility_ToR.SetPositionAllocator ("ns3::GridPositionAllocator",
-																			"MinX", DoubleValue (20.0),
+																			"MinX", DoubleValue (25.0),
 																			"MinY", DoubleValue (-50.0),
-																			"DeltaX", DoubleValue (60.0),
+																			"DeltaX", DoubleValue (80.0),
 																			"DeltaY", DoubleValue (10.0),
 																			"GridWidth", UintegerValue (100),
 																			"LayoutType", StringValue ("RowFirst"));
@@ -234,8 +263,8 @@ main (int argc, char *argv[])
 			MobilityHelper mobility_sw;
 			mobility_sw.SetPositionAllocator ("ns3::GridPositionAllocator",
 																			"MinX", DoubleValue (-5.0),
-																			"MinY", DoubleValue (-10.0),
-																			"DeltaX", DoubleValue (15.0),
+																			"MinY", DoubleValue (-20.0),
+																			"DeltaX", DoubleValue (20.0),
 																			"DeltaY", DoubleValue (10.0),
 																			"GridWidth", UintegerValue (1000),
 																			"LayoutType", StringValue ("RowFirst"));
@@ -246,8 +275,8 @@ main (int argc, char *argv[])
 		mobility_vm.SetPositionAllocator ("ns3::GridPositionAllocator",
 																		"MinX", DoubleValue (-10.0),
 																		"MinY", DoubleValue (1.00),
-																		"DeltaX", DoubleValue (8.0),
-																		"DeltaY", DoubleValue (5.0),
+																		"DeltaX", DoubleValue (10.0),
+																		"DeltaY", DoubleValue (5.0),	
 																		"GridWidth", UintegerValue (10),
 																		//"LayoutType", StringValue ("RowFirst"));
 																		"LayoutType", StringValue ("ColumnFirst"));
