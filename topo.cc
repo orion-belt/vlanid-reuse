@@ -60,7 +60,7 @@ main (int argc, char *argv[])
 		 LogComponentEnable ("topo", LOG_LEVEL_INFO);
 		}
 
-		int number_of_ToR_sw = 100;
+		int number_of_ToR_sw = 5;
 	  int number_of_sw = 4;
 		int number_of_VM = 20;
 
@@ -183,65 +183,23 @@ main (int argc, char *argv[])
 	  ndc2.Get(1)->SetAttribute ("ReceiveErrorModel", PointerValue (em1));
 	  }
 
-	std::vector<NetDeviceContainer> ndc_sw_gw;
+	std::vector<NetDeviceContainer> ndc_ToRsw_gw;
 	for(int i = 0;i<number_of_ToR_sw;i++)
 	  {
-	  NetDeviceContainer ndc3 = p2p.Install (net_ToRsw_gw[i]); //vm and switch
-	  ndc_sw_gw.insert(ndc_sw_gw.end(), ndc3);
+	  NetDeviceContainer ndc3 = p2p.Install (net_ToRsw_gw[i]); //ToR_switch and gw
+	  ndc_ToRsw_gw.insert(ndc_ToRsw_gw.end(), ndc3);
 	  ndc3.Get(0)->SetAttribute ("ReceiveErrorModel", PointerValue (em1));
 	  ndc3.Get(1)->SetAttribute ("ReceiveErrorModel", PointerValue (em1));
 	  }	
 	end= std::chrono::steady_clock::now();
 	NS_LOG_ERROR("Time required for P2P install = " << std::chrono::duration_cast<std::chrono::nanoseconds>(end - begin).count() <<" NanoSec");
-
-	begin = std::chrono::steady_clock::now();
-    //create wifi channel
-		/* No fragmentation and no RTS/CTS */
-		Config::SetDefault ("ns3::WifiRemoteStationManager::FragmentationThreshold", StringValue ("999999"));
-		Config::SetDefault ("ns3::WifiRemoteStationManager::RtsCtsThreshold", StringValue ("999999"));
-
-		std::vector<YansWifiChannelHelper> ywch;
-		std::vector<YansWifiPhyHelper> ywph;
-		std::vector<NetDeviceContainer>ndc_sta;
-		std::vector<NetDeviceContainer>ndc_ap_sta;
-		for(int i = 0; i<number_of_ToR_sw;i++)
-		{
-			for(int j = 0; j<number_of_sw;j++)
-				{
-					YansWifiChannelHelper channel1 = YansWifiChannelHelper::Default ();
-					YansWifiPhyHelper phy = YansWifiPhyHelper::Default ();
-					phy.SetChannel (channel1.Create ());
-					WifiHelper wifi;
-					wifi.SetStandard(WIFI_PHY_STANDARD_80211n_2_4GHZ);
-						//wifi.SetRemoteStationManager ("ns3::AarfWifiManager",);
-						wifi.SetRemoteStationManager ("ns3::ConstantRateWifiManager","DataMode",StringValue("HtMcs6"),"ControlMode",StringValue("HtMcs0"));
-						WifiMacHelper mac;
-						Ssid ssid = Ssid ("ns-3-ssid1");
-						mac.SetType ("ns3::StaWifiMac",
-													"Ssid", SsidValue (ssid),
-													"ActiveProbing", BooleanValue (false));
-						//NetDeviceContainer ndc3 = wifi.Install (phy, mac,netvm[(i*number_of_sw) +j]);//all sta connected to ap j of sw i
-						//ndc_sta.insert(ndc_sta.end(), ndc3);
-						mac.SetType ("ns3::ApWifiMac",
-													"Ssid", SsidValue (ssid));
-						NetDeviceContainer ndc4 = wifi.Install (phy, mac, sw_nodes.Get((i*number_of_sw) +j));
-						ndc_ap_sta.insert(ndc_ap_sta.end(), ndc4);
-
-
-						ywch.insert(ywch.end(), channel1);
-						ywph.insert(ywph.end(), phy);
-				}
-			}
-				end= std::chrono::steady_clock::now();
-			 NS_LOG_ERROR("Time required for WiFi install = " << std::chrono::duration_cast<std::chrono::nanoseconds>(end - begin).count() <<" NanoSec");
-
-		//***********************************************  Set position of wireless nodes **************************************
-			 	 begin = std::chrono::steady_clock::now();
-
+	
+//***********************************************  Set position of nodes **************************************
+			begin = std::chrono::steady_clock::now();
 			MobilityHelper mobility_gw;
 			mobility_gw.SetPositionAllocator ("ns3::GridPositionAllocator",
-																			"MinX", DoubleValue (4000.0),
-																			"MinY", DoubleValue (-500.0),
+																			"MinX", DoubleValue (50.0),
+																			"MinY", DoubleValue (-70.0),
 																			"DeltaX", DoubleValue (80.0),
 																			"DeltaY", DoubleValue (10.0),
 																			"GridWidth", UintegerValue (100),
@@ -278,44 +236,17 @@ main (int argc, char *argv[])
 																		"DeltaX", DoubleValue (10.0),
 																		"DeltaY", DoubleValue (5.0),	
 																		"GridWidth", UintegerValue (10),
-																		//"LayoutType", StringValue ("RowFirst"));
 																		"LayoutType", StringValue ("ColumnFirst"));
 		mobility_vm.SetMobilityModel ("ns3::ConstantPositionMobilityModel");
-		//for (int i = 0; i < number_of_sw*number_of_ToR_sw*number_of_VM; ++i)
-    //{
-		//NS_LOG_INFO("Problem is here"<<i);
 		mobility_vm.Install(net_vm);
-		//}	
-
-
-		//mobility1.Install (net_sw); //put ap on a grid
-
-
-	// 	for (int i = 0; i < number_of_sw*number_of_ToR_sw; ++i)
-  //   {
-	// 	Ptr<ListPositionAllocator> WifiStaPosition = CreateObject<ListPositionAllocator> ();
-	// 	Ptr<MobilityModel> ap_mobility = net_sw.Get(i)->GetObject<MobilityModel> ();
-	// 		Vector pos = ap_mobility->GetPosition();
-	// 	for(int j=0;j<number_of_VM;j++)
-	// 	{
-  //     int v1 = ((rand() % 61)-30)+(pos.x) + 200;
-  //     int v2 = ((rand() % 61)-30)+(pos.y);
-  //      if (pow(v1-pos.x-200,2)+pow(v2-pos.y,2)<=pow(30,2))
-  //        WifiStaPosition->Add (Vector(v1, v2, 0));
-  //      else
-  //        j--;
-	// 	}
-  //    // std::cout << " sta1 location1: " << v1-50<< "sta1 location2: "<<v2-30<<" \n";//added
-  //     mobility.SetPositionAllocator(WifiStaPosition);
-  // mobility1.Install(netvm[i]);
-  //   }
 		end= std::chrono::steady_clock::now();
 		std::cout << "Time required for positioning of nodes = " << std::chrono::duration_cast<std::chrono::nanoseconds>(end - begin).count() <<" NanoSec"<<std::endl;
 
 		//*********************************************** IP Stack **************************************
-				begin = std::chrono::steady_clock::now();
+		begin = std::chrono::steady_clock::now();
 
 		InternetStackHelper stack;
+
 		for(int i = 0;i<number_of_sw*number_of_ToR_sw;i++)
 		{
 		stack.Install (sw_nodes.Get(i));
@@ -329,9 +260,9 @@ main (int argc, char *argv[])
 		{
 			stack.Install (vm_nodes.Get(i));
 		}
-		NS_LOG_INFO ("Added ip stack.");
+		stack.Install (gw);
 
-	//	stack.Install (gw);
+		NS_LOG_INFO ("Added ip stack.");
 
 		NS_LOG_INFO ("Assigning IPv4 Addresses.");
 		Ipv4AddressHelper ipv4;
@@ -341,23 +272,22 @@ main (int argc, char *argv[])
 		std::vector<Ipv4InterfaceContainer> iic_ap_sw;
 		for(int i = 0; i<number_of_sw*number_of_ToR_sw;i++)
 		{
-                       
-
-			Ipv4InterfaceContainer iic1 = ipv4.Assign (ndc_sw_ToRsw[i]);  //switch and AP
+			Ipv4InterfaceContainer iic1 = ipv4.Assign (ndc_sw_ToRsw[i]);  //switch and ToRsw
 			iic_ap_sw.insert(iic_ap_sw.end(), iic1);
 		}
                 
 
-		// ipv4.SetBase (Ipv4Address ("192.168.0.0"), Ipv4Mask ("255.255.0.0"));
+		//ipv4.SetBase (Ipv4Address ("192.168.0.0"), Ipv4Mask ("255.255.0.0"));
 
 		// for(int i = 0;i<number_of_ToR_sw;i++)
 		// {
 		// 	Ipv4InterfaceContainer iic2 = ipv4.Assign (ndcsw_ctl[i]); //switch and controller
 		// }
-		// ipv4.SetBase (Ipv4Address ("192.169.0.0"), Ipv4Mask ("255.255.0.0"));
-
-		// 	Ipv4InterfaceContainer iic5 = ipv4.Assign (ndc5);   //switch and Gateway
-
+		ipv4.SetBase (Ipv4Address ("192.169.0.0"), Ipv4Mask ("255.255.0.0"));
+		for(int i = 0;i<number_of_ToR_sw;i++)
+		{
+			Ipv4InterfaceContainer iic2 = ipv4.Assign (ndc_ToRsw_gw[i]);  //switch and Gateway
+		}
 
 //
 //		ipv4.SetBase (Ipv4Address ("192.168.2.0"), Ipv4Mask ("255.255.255.0"));
@@ -371,24 +301,23 @@ main (int argc, char *argv[])
 
 		std::string a = "10.";
 
-		for(int i = 0;i<number_of_sw*number_of_ToR_sw;i++)
+		for(int i = 0; i<number_of_sw*number_of_ToR_sw*number_of_VM;i++)
 		{
 			int b = (i/250) +1;
 			std::string b_str = std::to_string(b);
 			int ip_c = (i%250);
-
 			std::string c_str  =std::to_string(ip_c);
 			std::string nw_ending = ".0";
 			std::string d = a+b_str+"."+c_str+ nw_ending;
 
 			const char * c = d.c_str();
 			ipv4.SetBase (Ipv4Address (c), Ipv4Mask ("255.255.255.0"));
-		//	Ipv4InterfaceContainer iic4 = ipv4.Assign (ndc_ap_sta[i]);               //AP
-		// /	Ipv4InterfaceContainer iic3 = ipv4.Assign (ndc_sta[i]);                  //Sta
+	    std::vector<Ipv4InterfaceContainer> iic_vm_sw;
+			Ipv4InterfaceContainer iic3 = ipv4.Assign (ndc_vm_sw[i]);  //switch and vm
+			iic_vm_sw.insert(iic_vm_sw.end(), iic3);
 		}
-
 				end= std::chrono::steady_clock::now();
-				NS_LOG_ERROR("Time required for IP Stack = " << std::chrono::duration_cast<std::chrono::nanoseconds>(end - begin).count() <<" NanoSec");
+				NS_LOG_ERROR("Time required for IP stack install and IP addressing = " << std::chrono::duration_cast<std::chrono::nanoseconds>(end - begin).count() <<" NanoSec");
 
 
 //**********************************---< IPv4 routing >---**************************************
