@@ -60,8 +60,8 @@ main (int argc, char *argv[])
 		 LogComponentEnable ("topo", LOG_LEVEL_INFO);
 		}
 
-		int number_of_ToR_sw = 5;
-	  int number_of_sw = 4;
+		int number_of_ToR_sw = 2;
+	  int number_of_sw = 5;
 		int number_of_VM = 20;
 
 		std::chrono::steady_clock::time_point begin;
@@ -267,41 +267,23 @@ main (int argc, char *argv[])
 		NS_LOG_INFO ("Assigning IPv4 Addresses.");
 		Ipv4AddressHelper ipv4;
 
-		ipv4.SetBase (Ipv4Address ("10.0.0.0"), Ipv4Mask ("255.255.0.0"));
 
+		ipv4.SetBase (Ipv4Address ("192.168.0.0"), Ipv4Mask ("255.255.0.0"));
+		for(int i = 0;i<number_of_ToR_sw;i++)
+		{
+			Ipv4InterfaceContainer iic2 = ipv4.Assign (ndc_ToRsw_gw[i]);  //ToRswitch and Gateway
+		}
+
+		ipv4.SetBase (Ipv4Address ("10.0.0.0"), Ipv4Mask ("255.255.0.0"));
 		std::vector<Ipv4InterfaceContainer> iic_ap_sw;
 		for(int i = 0; i<number_of_sw*number_of_ToR_sw;i++)
 		{
 			Ipv4InterfaceContainer iic1 = ipv4.Assign (ndc_sw_ToRsw[i]);  //switch and ToRsw
 			iic_ap_sw.insert(iic_ap_sw.end(), iic1);
 		}
-                
 
-		//ipv4.SetBase (Ipv4Address ("192.168.0.0"), Ipv4Mask ("255.255.0.0"));
-
-		// for(int i = 0;i<number_of_ToR_sw;i++)
-		// {
-		// 	Ipv4InterfaceContainer iic2 = ipv4.Assign (ndcsw_ctl[i]); //switch and controller
-		// }
-		ipv4.SetBase (Ipv4Address ("192.169.0.0"), Ipv4Mask ("255.255.0.0"));
-		for(int i = 0;i<number_of_ToR_sw;i++)
-		{
-			Ipv4InterfaceContainer iic2 = ipv4.Assign (ndc_ToRsw_gw[i]);  //switch and Gateway
-		}
-
-//
-//		ipv4.SetBase (Ipv4Address ("192.168.2.0"), Ipv4Mask ("255.255.255.0"));
-//		for(int i = 0;i<number_of_ToR_sw;i++)
-//		{
-//			Ipv4InterfaceContainer iic2 = ipv4.Assign (ndcsw_ctl[i]); //switch and controller
-//		}
-//	        ipv4.SetBase (Ipv4Address ("192.168.3.0"), Ipv4Mask ("255.255.255.0"));
-//		 Ipv4InterfaceContainer iic5 = ipv4.Assign (ndc5);   //Controller and Gateway
-
-
-		std::string a = "10.";
-
-		for(int i = 0; i<number_of_sw*number_of_ToR_sw*number_of_VM;i++)
+		std::string a = "20.";
+		for(int i = 0; i<number_of_sw*number_of_ToR_sw; i++)
 		{
 			int b = (i/250) +1;
 			std::string b_str = std::to_string(b);
@@ -313,8 +295,13 @@ main (int argc, char *argv[])
 			const char * c = d.c_str();
 			ipv4.SetBase (Ipv4Address (c), Ipv4Mask ("255.255.255.0"));
 	    std::vector<Ipv4InterfaceContainer> iic_vm_sw;
-			Ipv4InterfaceContainer iic3 = ipv4.Assign (ndc_vm_sw[i]);  //switch and vm
-			iic_vm_sw.insert(iic_vm_sw.end(), iic3);
+			 for (int j=0;j<number_of_VM; j++)
+			 {
+				Ipv4InterfaceContainer iic3 = ipv4.Assign (ndc_vm_sw[(i*number_of_VM) +j]);  //switch and vm
+			 }
+
+			// iic_vm_sw.insert(iic_vm_sw.end(), iic3);
+
 		}
 				end= std::chrono::steady_clock::now();
 				NS_LOG_ERROR("Time required for IP stack install and IP addressing = " << std::chrono::duration_cast<std::chrono::nanoseconds>(end - begin).count() <<" NanoSec");
@@ -322,7 +309,7 @@ main (int argc, char *argv[])
 
 //**********************************---< IPv4 routing >---**************************************
 		    begin = std::chrono::steady_clock::now();
-//	  	  Ipv4GlobalRoutingHelper::PopulateRoutingTables ();   // Global Routing
+	  	 // Ipv4GlobalRoutingHelper::PopulateRoutingTables ();   // Global Routing
 
 
 	  	/* Static routing
@@ -580,6 +567,9 @@ main (int argc, char *argv[])
 	  	 				end= std::chrono::steady_clock::now();
 	  	 			    NS_LOG_ERROR("Time required for Static Routing = " << std::chrono::duration_cast<std::chrono::nanoseconds>(end - begin).count() <<" NanoSec");
 
+
+	  	 				// end= std::chrono::steady_clock::now();
+	  	 			  //   NS_LOG_ERROR("Time required for Global Routing = " << std::chrono::duration_cast<std::chrono::nanoseconds>(end - begin).count() <<" NanoSec");
 
 		double endtime = 1;
 		Simulator::Stop (Seconds (endtime));
