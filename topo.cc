@@ -57,12 +57,14 @@ main (int argc, char *argv[])
 	cmd.Parse (argc,argv);
 	if (verbose)
 		{
-		 LogComponentEnable ("topo", LOG_LEVEL_INFO);
+		LogComponentEnable ("topo", LOG_LEVEL_INFO);
+		//LogComponentEnable ("GlobalRoutingHelper", LOG_LEVEL_ALL);
+		LogComponentEnable ("GlobalRouteManagerImpl", LOG_LEVEL_LOGIC);
 		}
 
-		int number_of_ToR_sw = 2;
-	  int number_of_sw = 5;
-		int number_of_VM = 20;
+		int number_of_ToR_sw = 1;
+	  int number_of_sw = 1;
+		int number_of_VM = 1;
 
 		std::chrono::steady_clock::time_point begin;
 		std::chrono::steady_clock::time_point end;
@@ -309,267 +311,267 @@ main (int argc, char *argv[])
 
 //**********************************---< IPv4 routing >---**************************************
 		    begin = std::chrono::steady_clock::now();
-	  	 // Ipv4GlobalRoutingHelper::PopulateRoutingTables ();   // Global Routing
+	  	  Ipv4GlobalRoutingHelper::PopulateRoutingTables ();   // Global Routing
 
 
 	  	/* Static routing
 	  	we use static routing to reduce the time it takes to populate the route
 	  	*/
 
-	  	//Static routes for stations - the gateway for all stations is the corresponding AP the station is connected to
-	  		std::string sta_gw_ip_start = "10.";
-	  		std::string sta_gw_ip_end = ".1";
-	  		for(int i =0;i<number_of_sw*number_of_ToR_sw;i++)
-	  		{
-	  				for(int j=0;j<number_of_VM;j++)
-	  			{
-	  					int gw_ip_b = (i/250) +1;
-	  					std::string gw_ip_b_str = std::to_string(gw_ip_b);
-	  					int gw_ip_c = (i%250);
-	  					std::string gw_ip_c_str  =std::to_string(gw_ip_c);
-	  					std::string gw_ip_addr = sta_gw_ip_start+gw_ip_b_str+"."+gw_ip_c_str+ sta_gw_ip_end;
-	  					const char *gw_ip = gw_ip_addr.c_str();
-//
-//	  					  Ipv4Address STAaddr =  vm_nodes.Get((i*number_of_VM) +j)->GetObject<Ipv4> ()->GetAddress (1, 0).GetLocal ();
-//	  		  			  NS_LOG_ERROR((i*number_of_VM) +j<<" "<<STAaddr<<" "<<gw_ip<<" ");
+// 	  	//Static routes for stations - the gateway for all stations is the corresponding AP the station is connected to
+// 	  		std::string sta_gw_ip_start = "10.";
+// 	  		std::string sta_gw_ip_end = ".1";
+// 	  		for(int i =0;i<number_of_sw*number_of_ToR_sw;i++)
+// 	  		{
+// 	  				for(int j=0;j<number_of_VM;j++)
+// 	  			{
+// 	  					int gw_ip_b = (i/250) +1;
+// 	  					std::string gw_ip_b_str = std::to_string(gw_ip_b);
+// 	  					int gw_ip_c = (i%250);
+// 	  					std::string gw_ip_c_str  =std::to_string(gw_ip_c);
+// 	  					std::string gw_ip_addr = sta_gw_ip_start+gw_ip_b_str+"."+gw_ip_c_str+ sta_gw_ip_end;
+// 	  					const char *gw_ip = gw_ip_addr.c_str();
+// //
+// //	  					  Ipv4Address STAaddr =  vm_nodes.Get((i*number_of_VM) +j)->GetObject<Ipv4> ()->GetAddress (1, 0).GetLocal ();
+// //	  		  			  NS_LOG_ERROR((i*number_of_VM) +j<<" "<<STAaddr<<" "<<gw_ip<<" ");
 
-	  				Ptr<Ipv4> ipv4STA = vm_nodes.Get((i*number_of_VM) +j)->GetObject<Ipv4> ();            // Static Routing
-	  				Ipv4StaticRoutingHelper STA;
-	  				Ptr<Ipv4StaticRouting> staticSTA = STA.GetStaticRouting (ipv4STA);
-	  				staticSTA->AddNetworkRouteTo (Ipv4Address ("192.169.0.0"),Ipv4Mask("255.255.0.0"), Ipv4Address (gw_ip), 1);
-	  				staticSTA->AddNetworkRouteTo (Ipv4Address ("192.168.0.0"),Ipv4Mask("255.255.0.0"), Ipv4Address (gw_ip), 1);
-	  				//staticSTA1->AddNetworkRouteTo (Ipv4Address ("10.0.0.0"),Ipv4Mask("255.255.0.0"), Ipv4Address (gw_ip), 1);
-	  			}
-	  		}
+// 	  				Ptr<Ipv4> ipv4STA = vm_nodes.Get((i*number_of_VM) +j)->GetObject<Ipv4> ();            // Static Routing
+// 	  				Ipv4StaticRoutingHelper STA;
+// 	  				Ptr<Ipv4StaticRouting> staticSTA = STA.GetStaticRouting (ipv4STA);
+// 	  				staticSTA->AddNetworkRouteTo (Ipv4Address ("192.169.0.0"),Ipv4Mask("255.255.0.0"), Ipv4Address (gw_ip), 1);
+// 	  				staticSTA->AddNetworkRouteTo (Ipv4Address ("192.168.0.0"),Ipv4Mask("255.255.0.0"), Ipv4Address (gw_ip), 1);
+// 	  				//staticSTA1->AddNetworkRouteTo (Ipv4Address ("10.0.0.0"),Ipv4Mask("255.255.0.0"), Ipv4Address (gw_ip), 1);
+// 	  			}
+// 	  		}
 
-	  	 	//Static routes for AP
-	  		 std::string ap_gw_ip_start = "10.0";
-	  		 int ip_d = 0;
-	  	     for(int i =0; i<number_of_ToR_sw;i++)
-	  	     {
-	  				for(int j=0;j<number_of_sw;j++)
-	  			{
-	  					int c;
+// 	  	 	//Static routes for AP
+// 	  		 std::string ap_gw_ip_start = "10.0";
+// 	  		 int ip_d = 0;
+// 	  	     for(int i =0; i<number_of_ToR_sw;i++)
+// 	  	     {
+// 	  				for(int j=0;j<number_of_sw;j++)
+// 	  			{
+// 	  					int c;
 
-	  					if (j == 254)
-	  					{
-	  						c = 1;
-	  					}
-	  					else
-	  					{
-	  				    c = (j/127);
-	  					}
-	  				//	NS_LOG_ERROR(c<<" "<<i*number_of_sw+j);
-	  					std::string c_str = std::to_string(c);
-	  					//int ip_d = ((i%250)+2);
+// 	  					if (j == 254)
+// 	  					{
+// 	  						c = 1;
+// 	  					}
+// 	  					else
+// 	  					{
+// 	  				    c = (j/127);
+// 	  					}
+// 	  				//	NS_LOG_ERROR(c<<" "<<i*number_of_sw+j);
+// 	  					std::string c_str = std::to_string(c);
+// 	  					//int ip_d = ((i%250)+2);
 
-	  					if (ip_d < 254)
-	  					{
-	  					ip_d = ip_d + 2;
-	  					}
-	  					else{
-	  						ip_d = 0;
-	  					    }
-	  					std::string d_str =std::to_string(ip_d);
-	  					std::string d = ap_gw_ip_start+"."+c_str+"."+d_str ;
-	  					const char *gw_ip = d.c_str();
+// 	  					if (ip_d < 254)
+// 	  					{
+// 	  					ip_d = ip_d + 2;
+// 	  					}
+// 	  					else{
+// 	  						ip_d = 0;
+// 	  					    }
+// 	  					std::string d_str =std::to_string(ip_d);
+// 	  					std::string d = ap_gw_ip_start+"."+c_str+"."+d_str ;
+// 	  					const char *gw_ip = d.c_str();
 
-	  	//			     Ipv4Address Apaddr = sw_nodes.Get(i*number_of_sw+j)->GetObject<Ipv4> ()->GetAddress (1, 0).GetLocal ();
-	  	//				 NS_LOG_ERROR(i*number_of_sw+j<<" "<<Apaddr<<" "<<gw_ip<<" ");
+// 	  	//			     Ipv4Address Apaddr = sw_nodes.Get(i*number_of_sw+j)->GetObject<Ipv4> ()->GetAddress (1, 0).GetLocal ();
+// 	  	//				 NS_LOG_ERROR(i*number_of_sw+j<<" "<<Apaddr<<" "<<gw_ip<<" ");
 
-	  	 		 Ptr<Ipv4> ipv4AP1 = sw_nodes.Get(i*number_of_sw+j)->GetObject<Ipv4> ();
-	  	 		// NS_LOG_ERROR(i*number_of_sw+j<<" "<<gw_ip);
-	  	   	     Ipv4StaticRoutingHelper AP1;
-	  	    	 Ptr<Ipv4StaticRouting> staticAP1 = AP1.GetStaticRouting (ipv4AP1);
-	  	    	 staticAP1->AddNetworkRouteTo (Ipv4Address ("192.169.0.0"),Ipv4Mask("255.255.0.0"), Ipv4Address (gw_ip), 1);
-	  	    	 staticAP1->AddNetworkRouteTo (Ipv4Address ("192.168.0.0"),Ipv4Mask("255.255.0.0"), Ipv4Address (gw_ip), 1);
-	  	    	// NS_LOG_ERROR(gw_ip);
-	  	       }
-	  		}
+// 	  	 		 Ptr<Ipv4> ipv4AP1 = sw_nodes.Get(i*number_of_sw+j)->GetObject<Ipv4> ();
+// 	  	 		// NS_LOG_ERROR(i*number_of_sw+j<<" "<<gw_ip);
+// 	  	   	     Ipv4StaticRoutingHelper AP1;
+// 	  	    	 Ptr<Ipv4StaticRouting> staticAP1 = AP1.GetStaticRouting (ipv4AP1);
+// 	  	    	 staticAP1->AddNetworkRouteTo (Ipv4Address ("192.169.0.0"),Ipv4Mask("255.255.0.0"), Ipv4Address (gw_ip), 1);
+// 	  	    	 staticAP1->AddNetworkRouteTo (Ipv4Address ("192.168.0.0"),Ipv4Mask("255.255.0.0"), Ipv4Address (gw_ip), 1);
+// 	  	    	// NS_LOG_ERROR(gw_ip);
+// 	  	       }
+// 	  		}
 
-		  	 	//Static routes for Switches
-	  		std::string nxt_hop_ip_start = "10.";
-	  		std::string nxt_hop_ip_end = ".0";
-	  		int nxt_hop_c = 0;
-	  		std::string sw_gw_ip_start = "10.0";
-	  	    ip_d = 1;
-	  	    for(int i = 0; i<number_of_ToR_sw;i++)
-	  	     {
-	  	       for(int j=0;j<number_of_sw;j++)
-	  			{
-	  				int nxt_hop_b = ((i*number_of_sw+j)/250+1);
-	  			    std::string nxt_hop_b_str = std::to_string(nxt_hop_b);
-	  				// std::string nxt_hop_c_str = std::to_string(nxt_hop_c);
-	  				 std::string nxt_hop_c_str;// = std::to_string(nxt_hop_c);
-
-
-	  					 std::string d_str =std::to_string(ip_d);
-	  					if (ip_d <= 253)
-	  					{
-	  					ip_d +=2;
-	  					}
-	  					else{
-	  						ip_d = 1;
-	  					}
-
-	  					if (nxt_hop_c < 250)
-	  								{
-	  						 	 	 nxt_hop_c_str = std::to_string(nxt_hop_c);
-	  								 nxt_hop_c +=1;
-	  								}
-	  								else{
-
-	  									 nxt_hop_c = 0;
-	  									 nxt_hop_c_str = std::to_string(nxt_hop_c);
-	  									 nxt_hop_c +=1;
-	  								}
-	  					std::string nxt_hop_sw = nxt_hop_ip_start+nxt_hop_b_str+"."+ nxt_hop_c_str+nxt_hop_ip_end;
-	  					const char *nxt_hop =nxt_hop_sw.c_str();
-
-	  					int gw_ip_c = ((i*number_of_sw+j)/128);
-	  					std::string gw_ip_c_str = std::to_string(gw_ip_c);
-	  					std::string gw_ip_nw= sw_gw_ip_start+"."+gw_ip_c_str+"."+d_str ;
-	  					const char *gw_ip = gw_ip_nw.c_str();
+// 		  	 	//Static routes for Switches
+// 	  		std::string nxt_hop_ip_start = "10.";
+// 	  		std::string nxt_hop_ip_end = ".0";
+// 	  		int nxt_hop_c = 0;
+// 	  		std::string sw_gw_ip_start = "10.0";
+// 	  	    ip_d = 1;
+// 	  	    for(int i = 0; i<number_of_ToR_sw;i++)
+// 	  	     {
+// 	  	       for(int j=0;j<number_of_sw;j++)
+// 	  			{
+// 	  				int nxt_hop_b = ((i*number_of_sw+j)/250+1);
+// 	  			    std::string nxt_hop_b_str = std::to_string(nxt_hop_b);
+// 	  				// std::string nxt_hop_c_str = std::to_string(nxt_hop_c);
+// 	  				 std::string nxt_hop_c_str;// = std::to_string(nxt_hop_c);
 
 
-	  	////
-	  	//				Ipv4Address SWaddr1 = sw_nodes.Get(i)->GetObject<Ipv4> ()->GetAddress (j+1, 0).GetLocal ();
-	  	//			   NS_LOG_ERROR(j<<" "<<SWaddr1<<" "<<gw_ip<<" "<<nxt_hop<<" ");
+// 	  					 std::string d_str =std::to_string(ip_d);
+// 	  					if (ip_d <= 253)
+// 	  					{
+// 	  					ip_d +=2;
+// 	  					}
+// 	  					else{
+// 	  						ip_d = 1;
+// 	  					}
 
-	  	     Ptr<Ipv4> ipv4SW1 = ToR_sw_nodes.Get(i)->GetObject<Ipv4> ();            // Static Routing
-	  	     Ipv4StaticRoutingHelper SW1;
-	  	     Ptr<Ipv4StaticRouting> staticSW1 = SW1.GetStaticRouting (ipv4SW1);
-	  	     staticSW1->AddNetworkRouteTo (Ipv4Address (nxt_hop),Ipv4Mask("255.255.255.0"), Ipv4Address (gw_ip),j+1);
-	  		//  staticSW1->AddNetworkRouteTo (Ipv4Address ("10.1.1.0"),Ipv4Mask("255.255.255.0"), Ipv4Address ("10.0.0.3"), 2);
+// 	  					if (nxt_hop_c < 250)
+// 	  								{
+// 	  						 	 	 nxt_hop_c_str = std::to_string(nxt_hop_c);
+// 	  								 nxt_hop_c +=1;
+// 	  								}
+// 	  								else{
 
+// 	  									 nxt_hop_c = 0;
+// 	  									 nxt_hop_c_str = std::to_string(nxt_hop_c);
+// 	  									 nxt_hop_c +=1;
+// 	  								}
+// 	  					std::string nxt_hop_sw = nxt_hop_ip_start+nxt_hop_b_str+"."+ nxt_hop_c_str+nxt_hop_ip_end;
+// 	  					const char *nxt_hop =nxt_hop_sw.c_str();
 
-
-
-	        	}
-	  	        Ptr<Ipv4> ipv4SW1 = ToR_sw_nodes.Get(i)->GetObject<Ipv4> ();            // Static Routing
-	  	        Ipv4StaticRoutingHelper SW1;
-	  	       Ptr<Ipv4StaticRouting> staticSW1 = SW1.GetStaticRouting (ipv4SW1);
-
-	  	  	   //Ipv4Address CTLaddr = ctl->GetObject<Ipv4> ()->GetAddress (i+1, 0).GetLocal ();
-	  	       //staticSW1->AddNetworkRouteTo (Ipv4Address ("192.169.0.0"),Ipv4Mask("255.255.0.0"), CTLaddr,(number_of_sw+1));
-	  	 	   //NS_LOG_ERROR(number_of_sw+1<<" "<<CTLaddr);
-	  		 }
-
-
-//	  	     int gw_ip_end =1;
-	  		 nxt_hop_c = 0;
-//	  		 std::string GW_gw_ip_start = "192.169.";
-
-	  	 	for(int i = 0; i<number_of_ToR_sw;i++)
-	  	     {
-	  	       for(int j=0;j<number_of_sw;j++)
-	  			{
-	  				int nxt_hop_b = ((i*number_of_sw+j)/250+1);
-	  			    std::string nxt_hop_b_str = std::to_string(nxt_hop_b);
-	  				// std::string nxt_hop_c_str = std::to_string(nxt_hop_c);
-	  			    std::string nxt_hop_c_str;// = std::to_string(nxt_hop_c);
-
-	  				if (nxt_hop_c < 250)
-	  								{
-	  						 	 	 nxt_hop_c_str = std::to_string(nxt_hop_c);
-	  								 nxt_hop_c +=1;
-	  								}
-	  								else{
-	  									 nxt_hop_c = 0;
-	  									 nxt_hop_c_str = std::to_string(nxt_hop_c);
-	  									 nxt_hop_c +=1;
-	  								}
+// 	  					int gw_ip_c = ((i*number_of_sw+j)/128);
+// 	  					std::string gw_ip_c_str = std::to_string(gw_ip_c);
+// 	  					std::string gw_ip_nw= sw_gw_ip_start+"."+gw_ip_c_str+"."+d_str ;
+// 	  					const char *gw_ip = gw_ip_nw.c_str();
 
 
-	  					std::string nxt_hop_nw_ip = nxt_hop_ip_start+nxt_hop_b_str+"."+ nxt_hop_c_str+nxt_hop_ip_end;
-	  				//	const char *nxt_hop =nxt_hop_nw_ip.c_str();
+// 	  	////
+// 	  	//				Ipv4Address SWaddr1 = sw_nodes.Get(i)->GetObject<Ipv4> ()->GetAddress (j+1, 0).GetLocal ();
+// 	  	//			   NS_LOG_ERROR(j<<" "<<SWaddr1<<" "<<gw_ip<<" "<<nxt_hop<<" ");
 
-//	  					int gw_ip_c = (i/128);
-//	  							std::string gw_ip_c_str = std::to_string(gw_ip_c);
-//
-//	  							std::string gw_ip_d_str;
-//	  					     	if (gw_ip_end > 255)
-//	  							  	   {
-//	  									gw_ip_end = 1;
-//	  									std::to_string(gw_ip_end);
-//	  							  	   }
-//	  							gw_ip_d_str =std::to_string(gw_ip_end);
-//	  							std::string d= GW_gw_ip_start+gw_ip_c_str+"."+gw_ip_d_str ;
-//	  							const char *gw_ip = d.c_str();
-     	//
-	  	//				Ipv4Address GWaddr = gw->GetObject<Ipv4> ()->GetAddress (i+1, 0).GetLocal ();
-	  	//			    NS_LOG_ERROR(i+1<<" Interface "<<GWaddr<<" GW "<<gw_ip<<" ,Ntx Hop "<<nxt_hop);
+// 	  	     Ptr<Ipv4> ipv4SW1 = ToR_sw_nodes.Get(i)->GetObject<Ipv4> ();            // Static Routing
+// 	  	     Ipv4StaticRoutingHelper SW1;
+// 	  	     Ptr<Ipv4StaticRouting> staticSW1 = SW1.GetStaticRouting (ipv4SW1);
+// 	  	     staticSW1->AddNetworkRouteTo (Ipv4Address (nxt_hop),Ipv4Mask("255.255.255.0"), Ipv4Address (gw_ip),j+1);
+// 	  		//  staticSW1->AddNetworkRouteTo (Ipv4Address ("10.1.1.0"),Ipv4Mask("255.255.255.0"), Ipv4Address ("10.0.0.3"), 2);
 
 
 
-	  		// Ptr<Ipv4> ipv4GW1 = gw->GetObject<Ipv4> ();            // Static Routing
-	  	     //Ipv4StaticRoutingHelper GW1;
-	  	    // Ptr<Ipv4StaticRouting> staticGW1 = GW1.GetStaticRouting (ipv4GW1);
-	  		 //staticGW1->AddNetworkRouteTo (Ipv4Address (nxt_hop),Ipv4Mask("255.255.255.0"), Ipv4Address ("192.169.0.1"),1);
-	  		 //staticGW1->AddNetworkRouteTo (Ipv4Address ("10.0.0.0"),Ipv4Mask("255.255.0.0"), Ipv4Address ("192.169.0.1"),1);
 
-	  		//nxt_hop = 10.1.j.0
+// 	        	}
+// 	  	        Ptr<Ipv4> ipv4SW1 = ToR_sw_nodes.Get(i)->GetObject<Ipv4> ();            // Static Routing
+// 	  	        Ipv4StaticRoutingHelper SW1;
+// 	  	       Ptr<Ipv4StaticRouting> staticSW1 = SW1.GetStaticRouting (ipv4SW1);
 
-	  			}
-	  			}
+// 	  	  	   //Ipv4Address CTLaddr = ctl->GetObject<Ipv4> ()->GetAddress (i+1, 0).GetLocal ();
+// 	  	       //staticSW1->AddNetworkRouteTo (Ipv4Address ("192.169.0.0"),Ipv4Mask("255.255.0.0"), CTLaddr,(number_of_sw+1));
+// 	  	 	   //NS_LOG_ERROR(number_of_sw+1<<" "<<CTLaddr);
+// 	  		 }
 
 
-	  	 	int gw_ip_end=1;
-	  	     nxt_hop_c = 0;
-	  	     std::string CTL_gw_ip_start = "192.168.";
+// //	  	     int gw_ip_end =1;
+// 	  		 nxt_hop_c = 0;
+// //	  		 std::string GW_gw_ip_start = "192.169.";
 
-	  	 	for(int i = 0; i<number_of_ToR_sw;i++)
-	  	     {
-	  	       for(int j=0;j<number_of_sw;j++)
-	  			{
-	  	    	    int nxt_hop_b = ((i*number_of_sw+j)/250+1);
-	  			    std::string nxt_hop_b_str = std::to_string(nxt_hop_b);
-	  			    std::string nxt_hop_c_str;// = std::to_string(nxt_hop_c);
-	  				  if (nxt_hop_c < 250)
-	  							{
-	  								 nxt_hop_c_str = std::to_string(nxt_hop_c);
-	  								 nxt_hop_c +=1;
-	  							}
-	  					else    {
-	  								 nxt_hop_c = 0;
-	  								 nxt_hop_c_str = std::to_string(nxt_hop_c);
-	  								 nxt_hop_c +=1;
-	  							}
-	  					std::string nxt_hop_ip = nxt_hop_ip_start+nxt_hop_b_str+"."+ nxt_hop_c_str+nxt_hop_ip_end;
-	  				//	const char *nxt_hop =nxt_hop_ip.c_str();
+// 	  	 	for(int i = 0; i<number_of_ToR_sw;i++)
+// 	  	     {
+// 	  	       for(int j=0;j<number_of_sw;j++)
+// 	  			{
+// 	  				int nxt_hop_b = ((i*number_of_sw+j)/250+1);
+// 	  			    std::string nxt_hop_b_str = std::to_string(nxt_hop_b);
+// 	  				// std::string nxt_hop_c_str = std::to_string(nxt_hop_c);
+// 	  			    std::string nxt_hop_c_str;// = std::to_string(nxt_hop_c);
 
-	  					int gw_ip_c = (i/128);
-	  					std::string gw_ip_c_str = std::to_string(gw_ip_c);
+// 	  				if (nxt_hop_c < 250)
+// 	  								{
+// 	  						 	 	 nxt_hop_c_str = std::to_string(nxt_hop_c);
+// 	  								 nxt_hop_c +=1;
+// 	  								}
+// 	  								else{
+// 	  									 nxt_hop_c = 0;
+// 	  									 nxt_hop_c_str = std::to_string(nxt_hop_c);
+// 	  									 nxt_hop_c +=1;
+// 	  								}
 
-	  					std::string gw_ip_d_str;
-	  			     	if (gw_ip_end > 255)
-	  					  	   {
-	  							gw_ip_end = 1;
-	  							std::to_string(gw_ip_end);
-	  					  	   }
-	  					gw_ip_d_str =std::to_string(gw_ip_end);
-	  					std::string d= CTL_gw_ip_start+gw_ip_c_str+"."+gw_ip_d_str ;
-	  	//				const char *gw_ip = d.c_str();
 
-	  	//				Ipv4Address CTLaddr = ctl->GetObject<Ipv4> ()->GetAddress (i+1, 0).GetLocal ();
-	  	//			    NS_LOG_ERROR(i+1<<" Interface "<<CTLaddr<<" GW "<<gw_ip<<" ,Ntx Hop "<<nxt_hop);
+// 	  					std::string nxt_hop_nw_ip = nxt_hop_ip_start+nxt_hop_b_str+"."+ nxt_hop_c_str+nxt_hop_ip_end;
+// 	  				//	const char *nxt_hop =nxt_hop_nw_ip.c_str();
 
-	  		//  Ptr<Ipv4> ipv4CTL = ctl->GetObject<Ipv4> ();            // Static Routing
-	  	  //    Ipv4StaticRoutingHelper CTL;
-	  	  //    Ptr<Ipv4StaticRouting> staticCTL = CTL.GetStaticRouting (ipv4CTL);
-	  		//  staticCTL->AddNetworkRouteTo (Ipv4Address (nxt_hop),Ipv4Mask("255.255.255.0"), Ipv4Address (gw_ip), i+1);
-	  		 //nxt_hop = 10.1.j.0
-	  			}
-	  	       gw_ip_end +=2;
-	  			}
+// //	  					int gw_ip_c = (i/128);
+// //	  							std::string gw_ip_c_str = std::to_string(gw_ip_c);
+// //
+// //	  							std::string gw_ip_d_str;
+// //	  					     	if (gw_ip_end > 255)
+// //	  							  	   {
+// //	  									gw_ip_end = 1;
+// //	  									std::to_string(gw_ip_end);
+// //	  							  	   }
+// //	  							gw_ip_d_str =std::to_string(gw_ip_end);
+// //	  							std::string d= GW_gw_ip_start+gw_ip_c_str+"."+gw_ip_d_str ;
+// //	  							const char *gw_ip = d.c_str();
+//      	//
+// 	  	//				Ipv4Address GWaddr = gw->GetObject<Ipv4> ()->GetAddress (i+1, 0).GetLocal ();
+// 	  	//			    NS_LOG_ERROR(i+1<<" Interface "<<GWaddr<<" GW "<<gw_ip<<" ,Ntx Hop "<<nxt_hop);
+
+
+
+// 	  		// Ptr<Ipv4> ipv4GW1 = gw->GetObject<Ipv4> ();            // Static Routing
+// 	  	     //Ipv4StaticRoutingHelper GW1;
+// 	  	    // Ptr<Ipv4StaticRouting> staticGW1 = GW1.GetStaticRouting (ipv4GW1);
+// 	  		 //staticGW1->AddNetworkRouteTo (Ipv4Address (nxt_hop),Ipv4Mask("255.255.255.0"), Ipv4Address ("192.169.0.1"),1);
+// 	  		 //staticGW1->AddNetworkRouteTo (Ipv4Address ("10.0.0.0"),Ipv4Mask("255.255.0.0"), Ipv4Address ("192.169.0.1"),1);
+
+// 	  		//nxt_hop = 10.1.j.0
+
+// 	  			}
+// 	  			}
+
+
+// 	  	 	int gw_ip_end=1;
+// 	  	     nxt_hop_c = 0;
+// 	  	     std::string CTL_gw_ip_start = "192.168.";
+
+// 	  	 	for(int i = 0; i<number_of_ToR_sw;i++)
+// 	  	     {
+// 	  	       for(int j=0;j<number_of_sw;j++)
+// 	  			{
+// 	  	    	    int nxt_hop_b = ((i*number_of_sw+j)/250+1);
+// 	  			    std::string nxt_hop_b_str = std::to_string(nxt_hop_b);
+// 	  			    std::string nxt_hop_c_str;// = std::to_string(nxt_hop_c);
+// 	  				  if (nxt_hop_c < 250)
+// 	  							{
+// 	  								 nxt_hop_c_str = std::to_string(nxt_hop_c);
+// 	  								 nxt_hop_c +=1;
+// 	  							}
+// 	  					else    {
+// 	  								 nxt_hop_c = 0;
+// 	  								 nxt_hop_c_str = std::to_string(nxt_hop_c);
+// 	  								 nxt_hop_c +=1;
+// 	  							}
+// 	  					std::string nxt_hop_ip = nxt_hop_ip_start+nxt_hop_b_str+"."+ nxt_hop_c_str+nxt_hop_ip_end;
+// 	  				//	const char *nxt_hop =nxt_hop_ip.c_str();
+
+// 	  					int gw_ip_c = (i/128);
+// 	  					std::string gw_ip_c_str = std::to_string(gw_ip_c);
+
+// 	  					std::string gw_ip_d_str;
+// 	  			     	if (gw_ip_end > 255)
+// 	  					  	   {
+// 	  							gw_ip_end = 1;
+// 	  							std::to_string(gw_ip_end);
+// 	  					  	   }
+// 	  					gw_ip_d_str =std::to_string(gw_ip_end);
+// 	  					std::string d= CTL_gw_ip_start+gw_ip_c_str+"."+gw_ip_d_str ;
+// 	  	//				const char *gw_ip = d.c_str();
+
+// 	  	//				Ipv4Address CTLaddr = ctl->GetObject<Ipv4> ()->GetAddress (i+1, 0).GetLocal ();
+// 	  	//			    NS_LOG_ERROR(i+1<<" Interface "<<CTLaddr<<" GW "<<gw_ip<<" ,Ntx Hop "<<nxt_hop);
+
+// 	  		//  Ptr<Ipv4> ipv4CTL = ctl->GetObject<Ipv4> ();            // Static Routing
+// 	  	  //    Ipv4StaticRoutingHelper CTL;
+// 	  	  //    Ptr<Ipv4StaticRouting> staticCTL = CTL.GetStaticRouting (ipv4CTL);
+// 	  		//  staticCTL->AddNetworkRouteTo (Ipv4Address (nxt_hop),Ipv4Mask("255.255.255.0"), Ipv4Address (gw_ip), i+1);
+// 	  		 //nxt_hop = 10.1.j.0
+// 	  			}
+// 	  	       gw_ip_end +=2;
+// 	  			}
+
+
+// 	  	 				end= std::chrono::steady_clock::now();
+// 	  	 			    NS_LOG_ERROR("Time required for Static Routing = " << std::chrono::duration_cast<std::chrono::nanoseconds>(end - begin).count() <<" NanoSec");
 
 
 	  	 				end= std::chrono::steady_clock::now();
-	  	 			    NS_LOG_ERROR("Time required for Static Routing = " << std::chrono::duration_cast<std::chrono::nanoseconds>(end - begin).count() <<" NanoSec");
-
-
-	  	 				// end= std::chrono::steady_clock::now();
-	  	 			  //   NS_LOG_ERROR("Time required for Global Routing = " << std::chrono::duration_cast<std::chrono::nanoseconds>(end - begin).count() <<" NanoSec");
+	  	 			    NS_LOG_ERROR("Time required for Global Routing = " << std::chrono::duration_cast<std::chrono::nanoseconds>(end - begin).count() <<" NanoSec");
 
 		double endtime = 1;
 		Simulator::Stop (Seconds (endtime));
