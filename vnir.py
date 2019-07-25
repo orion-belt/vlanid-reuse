@@ -43,6 +43,7 @@ class create_topology(object):
             self.number_of_ToRsw = None
             self.number_of_sw = None
             self.number_of_vm = None
+            self.total_number_of_vm = None
             self.number_of_pm = None
             self.VM_subnet = None
             self.domain = None
@@ -88,18 +89,25 @@ class create_topology(object):
                     else:
                         print(f'\t{row[0]}  \t\t{row[1]}   \t{row[2]}  \t\t{row[3]}    \t\t{row[4]} \t{row[5]}')
                         line_count += 1
-                print(f'Processed {line_count} lines.')
+                self.total_number_of_vm = (line_count-1) * int(row[2])
+                # print(f'Processed {line_count} lines.')
                 time.sleep(1)
                 message = " vm_info parsed"
                 self.logger.info(message)
 
         def get_tenant_request(self):
+            sum = 0
+            self.vm_array.clear()
             number = input("Enter the number of VN : ")
             print('Enter number of VM required in each VN : ')
             for i in range(int(number)):
                 n = input("VN "+str(i+1)+" : ")
+                sum = sum + int(n)
                 self.vm_array.append(int(n))
             print('Tenant requested : ', self.vm_array)
+            if sum > self.total_number_of_vm:
+                print("Excceds the total capacity !! Try Again !!!")
+                self.get_tenant_request()
             time.sleep(1)
 
             # tenant_req = input("Input tenant requirement : ")
