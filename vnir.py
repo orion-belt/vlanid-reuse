@@ -73,9 +73,10 @@ class create_topology(object):
             print(colored('So here each PM can host '+str(int(int(self.number_of_vm)/int(self.number_of_pm)))+' VMs','yellow'))
             responce = input(colored('Do you want to visualize topology [y/n] ? ','green'))
             if responce == 'y':
-                os.system("cd ../ns-allinone-3.29/ns-3.29/ && ./waf --run new_topo --vis")
+                # os.system("cd ../ns-allinone-3.29/ns-3.29/ && ./waf --run new_topo --vis")
+               os.system("cd ../ns-allinone-3.29/ns-3.29/ && ./waf --run"+' "scratch/new_topo --number_of_ToRsw='+str(self.number_of_ToRsw)+' --number_of_sw='+str(self.number_of_sw)+' --number_of_VM='+str(self.number_of_vm)+'" --vis')
             else:
-                os.system("cd ../ns-allinone-3.29/ns-3.29/ && ./waf --run new_topo ")
+               os.system("cd ../ns-allinone-3.29/ns-3.29/ && ./waf --run"+' "scratch/new_topo --number_of_ToRsw='+str(self.number_of_ToRsw)+' --number_of_sw='+str(self.number_of_sw)+' --number_of_VM='+str(self.number_of_vm)+'"')
             print('\n')
             message = " Topology simulated"
             self.logger.info(message)
@@ -142,7 +143,7 @@ class create_topology(object):
                             print(f'\t{row[0]}  \t{row[1]}   \t{row[2]}  \t\t{row[3]}    \t{row[4]} \t{row[5]}  \t{self.number_of_vm}  \t\t{str(self.vlan_id_start+1)}-{str(self.vlan_id_start + self.number_of_vm)}  \t\t\t{self.number_of_vm-self.number_of_vm}')
                             total_required_vm = total_required_vm - self.number_of_vm
                             self.vlan_id_start = self.vlan_id_start + self.number_of_vm
-                        elif total_required_vm < self.number_of_vm:
+                        elif total_required_vm < self.number_of_vm or total_required_vm == self.number_of_vm:
                             if total_required_vm > 4096:
                                 print('vlan usage limited')
                             if total_required_vm == 0:
@@ -191,8 +192,6 @@ if __name__ == '__main__':
         parser.add_argument('--vm', metavar='[number]', action='store', type=str,
                             required=False, default='20',
                             help='set the VM number per PM. default = 20')
-
-
 
         args = parser.parse_args()
 
