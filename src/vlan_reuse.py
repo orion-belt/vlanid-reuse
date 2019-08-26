@@ -1,8 +1,9 @@
 #!/usr/bin/env python3
-
 import atexit
 import os, time, sys
 import json, csv
+import readline
+import time
 import requests
 import argparse
 import logging
@@ -10,6 +11,7 @@ from termcolor import colored
 from tabulate import tabulate
 import subprocess
 import random
+import math
 
 logging.basicConfig(format='%(asctime)s] %(filename)s:%(lineno)d %(levelname)s '
                            '- %(message)s', datefmt='%m/%d/%Y %I:%M:%S %p')
@@ -34,6 +36,8 @@ class algo_vlan_reuse(object):
         self.number_of_edegesw = int(sw)
         self.number_of_vm = int(vm)
         self.number_of_pm = int(pm)
+        self.core_sw = []
+        self.edge_sw = []
         self.total_number_of_vm = 0
         self.allocated_vm = 0
         self.vlan_id_start = 0
@@ -41,6 +45,7 @@ class algo_vlan_reuse(object):
         self.available_vm_per_subnet = 0
         self.total_available_vm = 0
         self.tenant_req = 0
+        self.sum_tenant_req = 0
         self.resource_array = list()
         self.vm_array=[]
         self.vn_time_slot = 0
@@ -116,8 +121,9 @@ class algo_vlan_reuse(object):
             n = random.randint(1,15)
             self.tenant_req = self.tenant_req + int(n)
             self.vm_array.append(int(n))
+        self.sum_tenant_req  = sum(self.vm_array)
         self.vn_time_slot = random.randint(20,30)
-        message='Tenant requested : {} with time slot duration of {} seconds'.format( self.vm_array, self.vn_time_slot)
+        message='Tenant requested : {} with total VMs {} and time slot duration of {} seconds'.format( self.vm_array, self.sum_tenant_req,self.vn_time_slot)
         self.logger.info(message)
         self.vm_array.append(self.vn_time_slot)
 
@@ -137,20 +143,25 @@ class algo_vlan_reuse(object):
         # self.vm_array = [7, 10, 12, 5]
         tmp_time_slot=self.vm_array[-1] # get time slot information
         self.vm_array.pop((len(self.vm_array)-1)) # remove time slot information
+        self.vm_array.sort()
+        print(self.vm_array)
+        num_edge_sw = math.ceil(sum(self.vm_array)/self.number_of_vm)
+        print(num_edge_sw)
         for i in range (0, self.number_of_edegesw, 1):
             if self.resource_array[i][7] != 0:
                 if (self.tenant_req > self.resource_array[i][7]) or (self.tenant_req == self.resource_array[i][7]):
-                    self.resource_array[i] = [i+1, self.number_of_pm, self.number_of_vm, self.number_of_pm, self.number_of_vm, 0, 0, 0,  tmp_time_slot]
+                    self.resource_array[i] = [i+1, self.number_of_pm, self.number_of_vm, self.number_of_pm, self.number_of_vm, 0, 0, 0,  0, tmp_time_slot]
                     self.tenant_req = self.tenant_req - self.number_of_vm
                 else :
-                    self.resource_array[i] = [i+1, self.number_of_pm, self.number_of_vm, 0, self.tenant_req,0, self.number_of_pm, self.number_of_vm - self.tenant_req, 0]
+                    self.resource_array[i] = [i+1, self.number_of_pm, self.number_of_vm, 0, self.tenant_req,0, self.number_of_pm, self.number_of_vm - self.tenant_req, 0, tmp_time_slot]
                     self.tenant_req = 0
+                    tmp_time_slot = 0
                     pass
         message='Resource allocated'
         self.logger.info(message)
         time.sleep(1)
         self.tabular_data = (tabulate(self.resource_array, headers=['edge_sw', 'number_of_pm', 'number_of_vm', 'allocated_pm', 'allocated_vms',
-                                   'allocated_vlanid', 'available_pm', 'available_vm', 'time_slot_duration']))
+                                   'allocated_vlanids', 'tagged switches','available_pm', 'available_vm', 'time_slot_duration']))
         print(self.tabular_data)
         #self.get_tenant_request()
         time.sleep(3)
@@ -180,11 +191,46 @@ class algo_vlan_reuse(object):
         return out.decode("utf-8")
 
     def get_user_input_switch(self):
-        command=''.join([self.dbh_internal_url,' ','show usrInputSw'])
+        command=''.join([self.dbh_internal_url,' ','show usrInputSw',' >> sw_list.txt'])
         message='Getting user input Switch info'
         self.logger.info(message)
         out = subprocess.check_output(command, shell=True)
-        return out.decode("utf-8")
+        fh = open("sw_list.txt", "r+")
+        lines = fh.readlines()
+        num = 0
+        for x in lines:
+            if "TYPE" or "STATE" in x:
+                lines.pop(num)
+            num = num + 1
+        fh.close()
+        fh = open("sw_list.txt", "w")
+        lines = filter(lambda x: not x.isspace(), lines)
+        fh.write("".join(lines))
+        fh.close()
+        fh = open("sw_list.txt", "r+")
+        lines = fh.readlines()
+        num = 0
+        for x in lines:
+            if "DBH_SW_ROLE_EDGE" in x:
+                # print(lines[num+1])
+                edge_sw_ip = lines[num + 1]
+                edge_sw_ip = edge_sw_ip.split(" ")
+                self.edge_sw.append(edge_sw_ip[-1].rstrip('\n'))
+            if "DBH_SW_ROLE_CORE" in x:
+                # print(lines[num+1])
+                core_sw_ip = lines[num + 1]
+                core_sw_ip = core_sw_ip.split(" ")
+                self.core_sw.append(core_sw_ip[-1].rstrip('\n'))
+            num = num + 1
+        message='Core switch list - {} '.format(self.core_sw)
+        self.logger.info(message)
+        message='Edge switch list - {} '.format(self.edge_sw)
+        self.logger.info(message)
+        fh.close()
+        fh = open("sw_list.txt", "w")
+        fh.truncate()
+        fh.close()
+        return  self.core_sw, self.edge_sw
 
     def reset_db(self):
         command = ''.join([self.dbh_internal_url, ' ', 'resetdb'])
@@ -195,19 +241,30 @@ class algo_vlan_reuse(object):
         response = requests.put(request,auth=('admin','admin'))
         message='vlan {} added on edge switch {}'.format(vlan_id, switch_ip)
         self.logger.info(message)
+
     def enable_peregrine_bundles(self):
         bundles='405-415 425 426'
         command=''.join([self.peregrine_client_url,' bundle:start ', bundles])
         os.system(command)
-        print(command)
+        message='Peregrine bundles initiated in Opendaylight'
+        self.logger.info(message)
+        bundles="'405[[:blank:]]|406[[:blank:]]|407[[:blank:]]|408[[:blank:]]|409[[:blank:]]|410[[:blank:]]|411[[:blank:]]|412[[:blank:]]|413[[:blank:]]|414[[:blank:]]|415[[:blank:]]|425[[:blank:]]|426[[:blank:]]'"
+        command=''.join([self.peregrine_client_url,' bundle:list | egrep ', bundles])
+        message='Status of bundles :===>>'
+        self.logger.info(message)
+        os.system(command)
 
 ########################################################################################################################
 ############### Peregrine controller methods ###############
 ########################################################################################################################
 
     def goodbye(self):
-        print(colored("[*] You are now leaving ITRI's VLAN reuse framework .....", "green"))
+        print(colored("[*] You are now leaving VLAN ID reuse framework .....", "green"))
         sys.exit(0)
+
+    def terminate(self):
+        print(colored("[*] No more VLAN space availble .....", "green"))
+        #self.goodbye()
 
 if __name__ == '__main__':
         parser = argparse.ArgumentParser(
@@ -237,12 +294,14 @@ if __name__ == '__main__':
 
         #algo.initiate_tree_topology()
 
-        #algo.parse_vm_info()
+        algo.parse_vm_info()
+        #algo.enable_peregrine_bundles()
         # algo.greedy_vm_selection()
 
         # algo.get_tenant_request()
         # algo.greedy_vm_selection()
-        algo.enable_peregrine_bundles()
+        # algo.terminate()
         #algo.get_random_tenant_request()
-        #data=algo.get_user_input_switch()
-        #print("Here ",data)
+        # core_sw,edge_sw=algo.get_user_input_switch()
+        # print("core switches ",core_sw)
+        # print("edge switches ",edge_sw)
