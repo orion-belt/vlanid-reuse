@@ -38,9 +38,12 @@ class algo_vlan_reuse(object):
         self.number_of_pm = int(pm)
         self.core_sw = []
         self.edge_sw = []
+        self.allocated_vlanids = []
+        self.tagged_switches = []
         self.total_number_of_vm = 0
         self.allocated_vm = 0
-        self.vlan_id_start = 0
+        self.vlan_id = 0
+        self.vlan_id_list = []
         self.allocated_VLANID = 0
         self.available_vm_per_subnet = 0
         self.total_available_vm = 0
@@ -49,7 +52,9 @@ class algo_vlan_reuse(object):
         self.resource_array = list()
         self.vm_array=[]
         self.vn_time_slot = 0
-        self.tabular_data = None
+        self.consumption = 0
+        self.current_rack_number = 0 # Edge switch where current VN is hosting ends
+        self.tabular_data = None # This is matrix holding all information
         self.tree_path_url='http://127.0.0.1:8282/controller/nb/v3/peregrinedte/getPrimaryTree/'
         self.dbh_internal_url='/usr/local/peregrine-controller/bin/client -u karaf dbh_internal'
         self.peregrine_client_url='/usr/local/peregrine-controller/bin/client -u karaf'
@@ -61,11 +66,11 @@ class algo_vlan_reuse(object):
     def parse_vm_info(self):
         print(colored('[*] Detailed resource info', 'yellow'))
         for i in range(0, self.number_of_edegesw,1):
-            tmp = [i+1,self.number_of_pm,self.number_of_vm,0,0,0,self.number_of_pm,self.number_of_vm]
+            tmp = [i+1,self.number_of_pm,self.number_of_vm,0,0,0,self.number_of_pm,self.number_of_vm,0]
             self.resource_array.append(tmp)
             self.total_number_of_vm = self.total_number_of_vm + self.number_of_vm
         self.tabular_data = (tabulate(self.resource_array, headers=['edge_sw', 'number_of_pm', 'number_of_vm', 'allocated_pm', 'allocated_vms',
-                                   'allocated_vlanid', 'available_pm', 'available_vm']))
+                                   'allocated_vlanid', 'available_pm', 'available_vm', 'tagged_sw']))
         message='Resource info parsed'
         self.logger.info(message)
         print(self.tabular_data)
@@ -118,21 +123,14 @@ class algo_vlan_reuse(object):
         number = random.randint(1,5)
         # print(colored('Enter number of VM required in each VN : ', 'green'))
         for i in range(int(number)):
-            n = random.randint(1,15)
+            n = random.randint(5,15)
             self.tenant_req = self.tenant_req + int(n)
             self.vm_array.append(int(n))
         self.sum_tenant_req  = sum(self.vm_array)
-        self.vn_time_slot = random.randint(20,30)
-        message='Tenant requested : {} with total VMs {} and time slot duration of {} seconds'.format( self.vm_array, self.sum_tenant_req,self.vn_time_slot)
+        time.sleep(1)
+        message='Tenant requested : {}'.format( self.vm_array)
         self.logger.info(message)
-        self.vm_array.append(self.vn_time_slot)
-
-        #if self.tenant_req > self.total_number_of_vm:
-            #print(colored("Excceds the total capacity !! Try Again !!!", 'red'))
-            #self.get_random_tenant_request()
-            #time.sleep(3)
-
-        time.sleep(3)
+        time.sleep(1)
         self.greedy_vm_selection()
         # self.get_random_tenant_request()
 
@@ -140,35 +138,65 @@ class algo_vlan_reuse(object):
         message = "Performing greedy search for locating vm"
         self.logger.info(message)
         # do greedy delection algorithm
-        # self.vm_array = [7, 10, 12, 5]
-        tmp_time_slot=self.vm_array[-1] # get time slot information
-        self.vm_array.pop((len(self.vm_array)-1)) # remove time slot information
-        self.vm_array.sort()
-        print(self.vm_array)
+       # self.vm_array = [14, 8, 13, 3, 5, 25]
+        self.vm_array.sort() # sort tenant request in scending order
         num_edge_sw = math.ceil(sum(self.vm_array)/self.number_of_vm)
-        print(num_edge_sw)
-        for i in range (0, self.number_of_edegesw, 1):
-            if self.resource_array[i][7] != 0:
-                if (self.tenant_req > self.resource_array[i][7]) or (self.tenant_req == self.resource_array[i][7]):
-                    self.resource_array[i] = [i+1, self.number_of_pm, self.number_of_vm, self.number_of_pm, self.number_of_vm, 0, 0, 0,  0, tmp_time_slot]
-                    self.tenant_req = self.tenant_req - self.number_of_vm
-                else :
-                    self.resource_array[i] = [i+1, self.number_of_pm, self.number_of_vm, 0, self.tenant_req,0, self.number_of_pm, self.number_of_vm - self.tenant_req, 0, tmp_time_slot]
-                    self.tenant_req = 0
-                    tmp_time_slot = 0
-                    pass
-        message='Resource allocated'
+        message='Tenant request sorted {} , requires {} PMs and {} VMs'.format(self.vm_array, num_edge_sw, self.sum_tenant_req)
+        self.logger.info(message)
+        ##### VM allocation
+
+        # for i in range (0, self.number_of_edegesw, 1):
+        #     if self.resource_array[i][7] != 0: # Only if VM is available for allocation
+        #         if (self.tenant_req > self.resource_array[i][7]) or (self.tenant_req == self.resource_array[i][7]):
+        #             self.resource_array[i] = [i+1, self.number_of_pm, self.number_of_vm, self.number_of_pm, self.number_of_vm, 0, 0, 0,  0, tmp_time_slot]
+        #             self.tenant_req = self.tenant_req - self.number_of_vm
+        #         else :
+        #             self.resource_array[i] = [i+1, self.number_of_pm, self.number_of_vm, 0, self.tenant_req,0,0, self.number_of_pm, self.number_of_vm - self.tenant_req, tmp_time_slot]
+        #             self.tenant_req = 0
+        #             tmp_time_slot = 0
+        #             self.current_rack_number = i+1
+        #             break
+        # print(self.vm_array, )
+
+        for i in range (len(self.vm_array)):
+            self.tenant_req = self.vm_array[i]
+            for i in range (0, self.number_of_edegesw, 1):
+                if self.resource_array[i][7] != 0: # Only if VM is available for allocation
+                    if (self.tenant_req > self.resource_array[i][7]) or (self.tenant_req == self.resource_array[i][7]):
+                        tmp_vlan_list = self.resource_array[i] [5]
+                        self.tenant_req = self.tenant_req - self.resource_array[i][7]
+                        self.resource_array[i] = [i+1, self.number_of_pm, self.number_of_vm, self.number_of_pm, self.number_of_vm, tmp_vlan_list, 0, 0,  0]
+                        if self.tenant_req !=0:
+                            self.vlan_id_list.append(self.vlan_id + 1)
+                            self.resource_array[i][5] = self.vlan_id_list
+                    else :
+                        self.vlan_id_list.append(0)
+                        self.resource_array[i] = [i+1, self.number_of_pm, self.number_of_vm, 0, self.resource_array[i][4] + self.tenant_req, self.vlan_id_list, self.number_of_pm, self.resource_array[i][7] - self.tenant_req,0]
+                        break
+
+        message='Allocating resources '
+        self.logger.info(message)
+        self.consumption= self.consumption + (self.sum_tenant_req / (self.number_of_vm*self.number_of_edegesw)) * 100
+        if self.consumption > 100 :
+            self.resource_termination()
+        if self.consumption > 75 :
+            self.depart_vn_request()
+        message='Resource consumption level :- {} %'.format(self.consumption)
         self.logger.info(message)
         time.sleep(1)
         self.tabular_data = (tabulate(self.resource_array, headers=['edge_sw', 'number_of_pm', 'number_of_vm', 'allocated_pm', 'allocated_vms',
-                                   'allocated_vlanids', 'tagged switches','available_pm', 'available_vm', 'time_slot_duration']))
+                                   'allocated_vlanids','available_pm', 'available_vm','tagged_switches', ]))
         print(self.tabular_data)
-        #self.get_tenant_request()
-        time.sleep(3)
+        time.sleep(1)
         self.get_random_tenant_request()
 
         #self.get_tenant_request()
 
+    def depart_vn_request(self,):
+        message='Random removal of VN'
+        self.logger.info(message)
+        message='VN 3 departed'
+        self.logger.info(message)
 ########################################################################################################################
     ############### Peregrine controller methods ###############
 ########################################################################################################################
@@ -262,16 +290,26 @@ class algo_vlan_reuse(object):
         print(colored("[*] You are now leaving VLAN ID reuse framework .....", "green"))
         sys.exit(0)
 
-    def terminate(self):
+    def vlanid_termination(self):
         print(colored("[*] No more VLAN space availble .....", "green"))
         #self.goodbye()
+
+    def resource_termination(self):
+        print(colored("[*] No more resource space availble .....", "green"))
+        # self.goodbye()
+        sys.exit(0)
+
 
 if __name__ == '__main__':
         parser = argparse.ArgumentParser(
             description='Process commandline arguments and override configurations')
         parser.add_argument('--log', metavar='[level]', action='store', type=str,
                             required=False, default='debug',
-                            help='set the log level: debug, info (default), warning, error, critical. default = info')
+                            help='set the log level: debug, info , warning, error, critical. default = info')
+
+        parser.add_argument('--topo', metavar='[string]', action='store', type=str,
+                            required=False, default='spine-leaf',
+                            help='set the topology type : spine-leaf, core-spine-leaf, fat tree. default = spine-leaf')
 
         parser.add_argument('--ToRsw', metavar='[number]', action='store', type=str,
                             required=False, default='4',
@@ -282,12 +320,12 @@ if __name__ == '__main__':
                             help='set the edege switch number. default = 8')
 
         parser.add_argument('--pm', metavar='[number]', action='store', type=str,
-                            required=False, default='1',
-                            help='set the PM number per switch. default = 1')
+                            required=False, default='5',
+                            help='set the PM number per switch. default = 5')
 
         parser.add_argument('--vm', metavar='[number]', action='store', type=str,
-                            required=False, default='10',
-                            help='set the VM number per PM. default = 10')
+                            required=False, default='50',
+                            help='set the VM number per PM. default = 50')
         args = parser.parse_args()
 
         algo = algo_vlan_reuse(args.log, args.ToRsw, args.edege_sw, args.vm, args.pm )
@@ -302,6 +340,6 @@ if __name__ == '__main__':
         # algo.greedy_vm_selection()
         # algo.terminate()
         #algo.get_random_tenant_request()
-        # core_sw,edge_sw=algo.get_user_input_switch()
-        # print("core switches ",core_sw)
-        # print("edge switches ",edge_sw)
+        core_sw,edge_sw=algo.get_user_input_switch()
+        print("core switches ",core_sw)
+        print("edge switches ",edge_sw)
