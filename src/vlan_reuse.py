@@ -12,6 +12,7 @@ from tabulate import tabulate
 import subprocess
 import random
 import math
+import copy
 
 logging.basicConfig(format='%(asctime)s] %(filename)s:%(lineno)d %(levelname)s '
                            '- %(message)s', datefmt='%m/%d/%Y %I:%M:%S %p')
@@ -53,8 +54,11 @@ class algo_vlan_reuse(object):
         self.vm_array=[]
         self.vn_time_slot = 0
         self.consumption = 0
+        self.consumption_full = 100
+        self.consumption_threshold = 75
         self.current_rack_number = 0 # Edge switch where current VN is hosting ends
         self.tabular_data = None # This is matrix holding all information
+        self.fragmentation = False
         self.tree_path_url='http://127.0.0.1:8282/controller/nb/v3/peregrinedte/getPrimaryTree/'
         self.dbh_internal_url='/usr/local/peregrine-controller/bin/client -u karaf dbh_internal'
         self.peregrine_client_url='/usr/local/peregrine-controller/bin/client -u karaf'
@@ -65,16 +69,24 @@ class algo_vlan_reuse(object):
 
     def parse_vm_info(self):
         print(colored('[*] Detailed resource info', 'yellow'))
-        for i in range(0, self.number_of_edegesw,1):
-            tmp = [i+1,self.number_of_pm,self.number_of_vm,0,0,0,self.number_of_pm,self.number_of_vm,0]
+        for j in range(0, self.number_of_edegesw,1):
+            for i in range(0, self.number_of_pm,1):
+                if i == 0:
+                    tmp = [j+1,self.number_of_pm,self.number_of_vm,i+1,0,0,0, self.number_of_vm]
+                    self.resource_array.append(tmp)
+                    self.total_number_of_vm = self.total_number_of_vm + self.number_of_vm
+                else:
+                    tmp = ['','','',i+1,0,0,0,self.number_of_vm]
+                    self.resource_array.append(tmp)
+                    self.total_number_of_vm = self.total_number_of_vm + self.number_of_vm
+            tmp = ['-------', '-------', '-------', '-------', '-------', '-------', '-------', '-------']
             self.resource_array.append(tmp)
-            self.total_number_of_vm = self.total_number_of_vm + self.number_of_vm
-        self.tabular_data = (tabulate(self.resource_array, headers=['edge_sw', 'number_of_pm', 'number_of_vm', 'allocated_pm', 'allocated_vms',
-                                   'allocated_vlanid', 'available_pm', 'available_vm', 'tagged_sw']))
+        self.tabular_data = (tabulate(self.resource_array, headers=['edge_sw', 'number_of_pm', 'number_of_vm','pm', 'allocated_pm', 'allocated_vms',
+                                   'allocated_vlanid', 'available_vm', 'tagged_sw']))
         message='Resource info parsed'
         self.logger.info(message)
         print(self.tabular_data)
-        time.sleep(1)
+        time.sleep(3)
         # self.get_tenant_request()
         self.get_random_tenant_request() #uniform random distribution
 
@@ -138,7 +150,7 @@ class algo_vlan_reuse(object):
         message = "Performing greedy search for locating vm"
         self.logger.info(message)
         # do greedy delection algorithm
-       # self.vm_array = [14, 8, 13, 3, 5, 25]
+        self.vm_array = [14, 8, 13, 3, 5, 25]
         self.vm_array.sort() # sort tenant request in scending order
         num_edge_sw = math.ceil(sum(self.vm_array)/self.number_of_vm)
         message='Tenant request sorted {} , requires {} PMs and {} VMs'.format(self.vm_array, num_edge_sw, self.sum_tenant_req)
@@ -157,40 +169,65 @@ class algo_vlan_reuse(object):
         #             self.current_rack_number = i+1
         #             break
         # print(self.vm_array, )
-
-        for i in range (len(self.vm_array)):
-            self.tenant_req = self.vm_array[i]
-            for i in range (0, self.number_of_edegesw, 1):
-                if self.resource_array[i][7] != 0: # Only if VM is available for allocation
-                    if (self.tenant_req > self.resource_array[i][7]) or (self.tenant_req == self.resource_array[i][7]):
-                        tmp_vlan_list = self.resource_array[i] [5]
-                        self.tenant_req = self.tenant_req - self.resource_array[i][7]
-                        self.resource_array[i] = [i+1, self.number_of_pm, self.number_of_vm, self.number_of_pm, self.number_of_vm, tmp_vlan_list, 0, 0,  0]
-                        if self.tenant_req !=0:
-                            self.vlan_id_list.append(self.vlan_id + 1)
-                            self.resource_array[i][5] = self.vlan_id_list
-                    else :
-                        self.vlan_id_list.append(0)
-                        self.resource_array[i] = [i+1, self.number_of_pm, self.number_of_vm, 0, self.resource_array[i][4] + self.tenant_req, self.vlan_id_list, self.number_of_pm, self.resource_array[i][7] - self.tenant_req,0]
-                        break
-
+        current_pm = 0
+        tmp = []
+        for k in range (len(self.vm_array)):
+            self.tenant_req = self.vm_array[k]
+            for i in range (0, self.number_of_edegesw, 1): # Check for every edge switch
+                if self.tenant_req == 0 or self.resource_array[current_pm][0]== '-------': # Move to next VN request element
+                    break
+                for j in range(0,self.number_of_pm,1):
+                    current_pm = i*self.number_of_pm + j # Current physical machine
+                    if self.resource_array[current_pm][7] != 0: # Only if VM is available for allocation
+                        if (self.tenant_req > self.resource_array[current_pm][7]) or (self.tenant_req == self.resource_array[i][7]):
+                            tmp_vlan_list = self.resource_array[current_pm][6]
+                            # ['edge_sw', 'number_of_pm', 'number_of_vm','pm','allocated_pm', 'allocated_vms','allocated_vlanid', 'available_vm']
+                            ##['edge_sw', 'number_of_pm', 'number_of_vm','pm','allocated_pm', 'allocated_vms','allocated_vlanids', 'available_vm', 'tagged_switches', 'available vlanids']
+                            self.tenant_req = self.tenant_req - self.resource_array[current_pm][7]
+                            if i == 0:
+                                self.resource_array[current_pm] = [i+1, self.number_of_pm, self.number_of_vm, j+1, 1,self.number_of_vm, tmp_vlan_list, 0, 0, 0]
+                            else:
+                                self.resource_array[current_pm] = ['', '', '', j+1, 1,self.number_of_vm, tmp_vlan_list, 0, 0, 0]
+                            # self.tenant_req = self.tenant_req - self.resource_array[i][7]
+                            if self.tenant_req !=0:
+                                self.vlan_id = self.vlan_id + 1
+                                tmp_vlan_list.append(self.vlan_id)
+                                self.resource_array[current_pm][6] = tmp_vlan_list
+                            self.fragmentation = True
+                        else :
+                            # ['edge_sw', 'number_of_pm', 'number_of_vm','pm', 'allocated_pm', 'allocated_vms','allocated_vlanid', 'available_vm']
+                            ##['edge_sw', 'number_of_pm', 'number_of_vm','pm', 'allocated_pm', 'allocated_vms', 'allocated_vlanids', 'available_vm', 'tagged_switches', 'available vlanids']
+                            if self.fragmentation == False:
+                                #self.vlan_id_list.append(0)
+                                tmp.append(0)
+                            else:
+                                tmp=list(self.vlan_id_list)
+                                tmp.clear()
+                                tmp.append(self.vlan_id)
+                            self.resource_array[current_pm] = [i+1, self.number_of_pm, self.number_of_vm,j+1, 0, self.resource_array[current_pm][5] + self.tenant_req, tmp,  self.resource_array[current_pm][7] - self.tenant_req,0]
+                            self.tenant_req = 0
+                            self.fragmentation = False
+                            break
         message='Allocating resources '
         self.logger.info(message)
-        self.consumption= self.consumption + (self.sum_tenant_req / (self.number_of_vm*self.number_of_edegesw)) * 100
-        if self.consumption > 100 :
-            self.resource_termination()
-        if self.consumption > 75 :
-            self.depart_vn_request()
+        self.consumption= self.consumption + (self.sum_tenant_req / (self.number_of_vm*self.number_of_edegesw*self.number_of_pm)) * 100
         message='Resource consumption level :- {} %'.format(self.consumption)
         self.logger.info(message)
+        if self.consumption > self.consumption_full:
+            message = 'Resource consumption at full capacity'
+            self.logger.info(message)
+            self.resource_termination() # Exit framework
+        if self.consumption > self.consumption_threshold:
+            message = 'Resource consumption at threshold level'
+            self.logger.info(message)
+            self.depart_vn_request() # Random departure of VN
         time.sleep(1)
-        self.tabular_data = (tabulate(self.resource_array, headers=['edge_sw', 'number_of_pm', 'number_of_vm', 'allocated_pm', 'allocated_vms',
-                                   'allocated_vlanids','available_pm', 'available_vm','tagged_switches', ]))
+        self.tabular_data = (tabulate(self.resource_array, headers=['edge_sw', 'number_of_pm', 'number_of_vm', 'pm', 'allocated_vms',
+                                   'allocated_vlanids','available_pm', 'available_vm','tagged_switches','available vlanids' ]))
         print(self.tabular_data)
         time.sleep(1)
-        self.get_random_tenant_request()
-
-        #self.get_tenant_request()
+        self.get_random_tenant_request() # Random input tenant ewquest
+        #self.get_tenant_request() # User input tenant ewquest
 
     def depart_vn_request(self,):
         message='Random removal of VN'
@@ -324,8 +361,8 @@ if __name__ == '__main__':
                             help='set the PM number per switch. default = 5')
 
         parser.add_argument('--vm', metavar='[number]', action='store', type=str,
-                            required=False, default='50',
-                            help='set the VM number per PM. default = 50')
+                            required=False, default='10',
+                            help='set the VM number per PM. default = 10')
         args = parser.parse_args()
 
         algo = algo_vlan_reuse(args.log, args.ToRsw, args.edege_sw, args.vm, args.pm )
@@ -340,6 +377,6 @@ if __name__ == '__main__':
         # algo.greedy_vm_selection()
         # algo.terminate()
         #algo.get_random_tenant_request()
-        core_sw,edge_sw=algo.get_user_input_switch()
-        print("core switches ",core_sw)
-        print("edge switches ",edge_sw)
+        # core_sw,edge_sw=algo.get_user_input_switch()
+        # print("core switches ",core_sw)
+        # print("edge switches ",edge_sw)
