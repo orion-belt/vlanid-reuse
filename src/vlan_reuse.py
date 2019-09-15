@@ -150,7 +150,7 @@ class algo_vlan_reuse(object):
         message = "Performing greedy search for locating vm"
         self.logger.info(message)
         # do greedy delection algorithm
-        self.vm_array = [14, 8, 13, 3, 5, 25]
+        # self.vm_array = [14, 8, 13, 3, 5, 15]
         self.vm_array.sort() # sort tenant request in scending order
         num_edge_sw = math.ceil(sum(self.vm_array)/self.number_of_vm)
         message='Tenant request sorted {} , requires {} PMs and {} VMs'.format(self.vm_array, num_edge_sw, self.sum_tenant_req)
@@ -174,23 +174,28 @@ class algo_vlan_reuse(object):
         for k in range (len(self.vm_array)):
             self.tenant_req = self.vm_array[k]
             for i in range (0, self.number_of_edegesw, 1): # Check for every edge switch
-                if self.tenant_req == 0 or self.resource_array[current_pm][0]== '-------': # Move to next VN request element
+                if self.tenant_req == 0 : # Move to next VN request element
                     break
                 for j in range(0,self.number_of_pm,1):
-                    current_pm = i*self.number_of_pm + j # Current physical machine
+                    current_pm = i * self.number_of_pm + j + i # Current physical machine
                     if self.resource_array[current_pm][7] != 0: # Only if VM is available for allocation
-                        if (self.tenant_req > self.resource_array[current_pm][7]) or (self.tenant_req == self.resource_array[i][7]):
+
+
+                        if (self.tenant_req > self.resource_array[current_pm][7]) or (self.tenant_req == self.resource_array[current_pm][7]):
                             tmp_vlan_list = self.resource_array[current_pm][6]
                             # ['edge_sw', 'number_of_pm', 'number_of_vm','pm','allocated_pm', 'allocated_vms','allocated_vlanid', 'available_vm']
                             ##['edge_sw', 'number_of_pm', 'number_of_vm','pm','allocated_pm', 'allocated_vms','allocated_vlanids', 'available_vm', 'tagged_switches', 'available vlanids']
                             self.tenant_req = self.tenant_req - self.resource_array[current_pm][7]
-                            if i == 0:
+                            if j == 0:
                                 self.resource_array[current_pm] = [i+1, self.number_of_pm, self.number_of_vm, j+1, 1,self.number_of_vm, tmp_vlan_list, 0, 0, 0]
                             else:
                                 self.resource_array[current_pm] = ['', '', '', j+1, 1,self.number_of_vm, tmp_vlan_list, 0, 0, 0]
                             # self.tenant_req = self.tenant_req - self.resource_array[i][7]
                             if self.tenant_req !=0:
-                                self.vlan_id = self.vlan_id + 1
+                                if self.fragmentation == True:
+                                    tmp_vlan_list = []
+                                else:
+                                    self.vlan_id = self.vlan_id + 1
                                 tmp_vlan_list.append(self.vlan_id)
                                 self.resource_array[current_pm][6] = tmp_vlan_list
                             self.fragmentation = True
@@ -204,7 +209,10 @@ class algo_vlan_reuse(object):
                                 tmp=list(self.vlan_id_list)
                                 tmp.clear()
                                 tmp.append(self.vlan_id)
-                            self.resource_array[current_pm] = [i+1, self.number_of_pm, self.number_of_vm,j+1, 0, self.resource_array[current_pm][5] + self.tenant_req, tmp,  self.resource_array[current_pm][7] - self.tenant_req,0]
+                            if j == 0:
+                                self.resource_array[current_pm] = [i+1, self.number_of_pm, self.number_of_vm,j+1, 0, self.resource_array[current_pm][5] + self.tenant_req, tmp,  self.resource_array[current_pm][7] - self.tenant_req,0]
+                            else:
+                                self.resource_array[current_pm] = ['', '', '',j+1, 0, self.resource_array[current_pm][5] + self.tenant_req, tmp,  self.resource_array[current_pm][7] - self.tenant_req,0]
                             self.tenant_req = 0
                             self.fragmentation = False
                             break
