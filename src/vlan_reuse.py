@@ -151,47 +151,35 @@ class algo_vlan_reuse(object):
         self.logger.info(message)
         # do greedy delection algorithm
         # self.vm_array = [14, 8, 13, 3, 5, 15]
+        self.vm_array =  [11, 13]
         self.vm_array.sort() # sort tenant request in scending order
         num_edge_sw = math.ceil(sum(self.vm_array)/self.number_of_vm)
         message='Tenant request sorted {} , requires {} PMs and {} VMs'.format(self.vm_array, num_edge_sw, self.sum_tenant_req)
         self.logger.info(message)
         ##### VM allocation
 
-        # for i in range (0, self.number_of_edegesw, 1):
-        #     if self.resource_array[i][7] != 0: # Only if VM is available for allocation
-        #         if (self.tenant_req > self.resource_array[i][7]) or (self.tenant_req == self.resource_array[i][7]):
-        #             self.resource_array[i] = [i+1, self.number_of_pm, self.number_of_vm, self.number_of_pm, self.number_of_vm, 0, 0, 0,  0, tmp_time_slot]
-        #             self.tenant_req = self.tenant_req - self.number_of_vm
-        #         else :
-        #             self.resource_array[i] = [i+1, self.number_of_pm, self.number_of_vm, 0, self.tenant_req,0,0, self.number_of_pm, self.number_of_vm - self.tenant_req, tmp_time_slot]
-        #             self.tenant_req = 0
-        #             tmp_time_slot = 0
-        #             self.current_rack_number = i+1
-        #             break
-        # print(self.vm_array, )
         current_pm = 0
         tmp = []
         for k in range (len(self.vm_array)):
             self.tenant_req = self.vm_array[k]
             for i in range (0, self.number_of_edegesw, 1): # Check for every edge switch
-                if self.tenant_req == 0 : # Move to next VN request element
+                if self.tenant_req == 0 : # Move to next VN request element if no more VM req in VN
                     break
-                for j in range(0,self.number_of_pm,1):
+                for j in range(0,self.number_of_pm,1):   # Check for every physical machine
                     current_pm = i * self.number_of_pm + j + i # Current physical machine
                     if self.resource_array[current_pm][7] != 0: # Only if VM is available for allocation
-
-
                         if (self.tenant_req > self.resource_array[current_pm][7]) or (self.tenant_req == self.resource_array[current_pm][7]):
                             tmp_vlan_list = self.resource_array[current_pm][6]
-                            # ['edge_sw', 'number_of_pm', 'number_of_vm','pm','allocated_pm', 'allocated_vms','allocated_vlanid', 'available_vm']
+                            if type(tmp_vlan_list) is int:
+                                tmp_vlan_list = [tmp_vlan_list]
                             ##['edge_sw', 'number_of_pm', 'number_of_vm','pm','allocated_pm', 'allocated_vms','allocated_vlanids', 'available_vm', 'tagged_switches', 'available vlanids']
                             self.tenant_req = self.tenant_req - self.resource_array[current_pm][7]
-                            if j == 0:
+                            if j == 0:  # This is just for prety printing
                                 self.resource_array[current_pm] = [i+1, self.number_of_pm, self.number_of_vm, j+1, 1,self.number_of_vm, tmp_vlan_list, 0, 0, 0]
                             else:
                                 self.resource_array[current_pm] = ['', '', '', j+1, 1,self.number_of_vm, tmp_vlan_list, 0, 0, 0]
                             # self.tenant_req = self.tenant_req - self.resource_array[i][7]
-                            if self.tenant_req !=0:
+                            if self.tenant_req !=0: # Means VN is fragmented, so we need to get VLAN id
                                 if self.fragmentation == True:
                                     tmp_vlan_list = []
                                 else:
@@ -200,7 +188,6 @@ class algo_vlan_reuse(object):
                                 self.resource_array[current_pm][6] = tmp_vlan_list
                             self.fragmentation = True
                         else :
-                            # ['edge_sw', 'number_of_pm', 'number_of_vm','pm', 'allocated_pm', 'allocated_vms','allocated_vlanid', 'available_vm']
                             ##['edge_sw', 'number_of_pm', 'number_of_vm','pm', 'allocated_pm', 'allocated_vms', 'allocated_vlanids', 'available_vm', 'tagged_switches', 'available vlanids']
                             if self.fragmentation == False:
                                 #self.vlan_id_list.append(0)
@@ -209,7 +196,7 @@ class algo_vlan_reuse(object):
                                 tmp=list(self.vlan_id_list)
                                 tmp.clear()
                                 tmp.append(self.vlan_id)
-                            if j == 0:
+                            if j == 0: # This is just for prety printing
                                 self.resource_array[current_pm] = [i+1, self.number_of_pm, self.number_of_vm,j+1, 0, self.resource_array[current_pm][5] + self.tenant_req, tmp,  self.resource_array[current_pm][7] - self.tenant_req,0]
                             else:
                                 self.resource_array[current_pm] = ['', '', '',j+1, 0, self.resource_array[current_pm][5] + self.tenant_req, tmp,  self.resource_array[current_pm][7] - self.tenant_req,0]
