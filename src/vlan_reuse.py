@@ -44,6 +44,7 @@ class algo_vlan_reuse(object):
         self.total_number_of_vm = 0
         self.allocated_vm = 0
         self.vlan_id = 0
+        self.fake_vlan_id = 110
         self.vlan_id_list = []
         self.allocated_VLANID = 0
         self.available_vm_per_subnet = 0
@@ -64,7 +65,9 @@ class algo_vlan_reuse(object):
         self.peregrine_client_url='/usr/local/peregrine-controller/bin/client -u karaf'
 
     def build(self):
-        self.get_tenant_request()
+        # self.get_tenant_request()
+        self.core_sw ,self.edge_sw  = self.get_user_input_switch()
+        print(self.edge_sw)
         pass
 
     def parse_vm_info(self):
@@ -72,7 +75,7 @@ class algo_vlan_reuse(object):
         for j in range(0, self.number_of_edegesw,1):
             for i in range(0, self.number_of_pm,1):
                 if i == 0:
-                    tmp = [j+1,self.number_of_pm,self.number_of_vm,i+1,0,0,0, self.number_of_vm]
+                    tmp = [1+j+self.number_of_ToRsw,self.number_of_pm,self.number_of_vm,i+1,0,0,0, self.number_of_vm]
                     self.resource_array.append(tmp)
                     self.total_number_of_vm = self.total_number_of_vm + self.number_of_vm
                 else:
@@ -151,7 +154,6 @@ class algo_vlan_reuse(object):
         self.logger.info(message)
         # do greedy delection algorithm
         # self.vm_array = [14, 8, 13, 3, 5, 15]
-        self.vm_array =  [11, 13]
         self.vm_array.sort() # sort tenant request in scending order
         num_edge_sw = math.ceil(sum(self.vm_array)/self.number_of_vm)
         message='Tenant request sorted {} , requires {} PMs and {} VMs'.format(self.vm_array, num_edge_sw, self.sum_tenant_req)
@@ -170,13 +172,14 @@ class algo_vlan_reuse(object):
                     if self.resource_array[current_pm][7] != 0: # Only if VM is available for allocation
                         if (self.tenant_req > self.resource_array[current_pm][7]) or (self.tenant_req == self.resource_array[current_pm][7]):
                             tmp_vlan_list = self.resource_array[current_pm][6]
+
                             if type(tmp_vlan_list) is int:
                                 tmp_vlan_list = [tmp_vlan_list]
                             ##['edge_sw', 'number_of_pm', 'number_of_vm','pm','allocated_pm', 'allocated_vms','allocated_vlanids', 'available_vm', 'tagged_switches', 'available vlanids']
                             self.tenant_req = self.tenant_req - self.resource_array[current_pm][7]
                             if j == 0:  # This is just for prety printing
-                                self.resource_array[current_pm] = [i+1, self.number_of_pm, self.number_of_vm, j+1, 1,self.number_of_vm, tmp_vlan_list, 0, 0, 0]
-                            else:
+                                self.resource_array[current_pm] = [1+i+self.number_of_ToRsw, self.number_of_pm, self.number_of_vm, j+1, 1,self.number_of_vm, tmp_vlan_list, 0, 0, 0]
+                            if j != 0:
                                 self.resource_array[current_pm] = ['', '', '', j+1, 1,self.number_of_vm, tmp_vlan_list, 0, 0, 0]
                             # self.tenant_req = self.tenant_req - self.resource_array[i][7]
                             if self.tenant_req !=0: # Means VN is fragmented, so we need to get VLAN id
@@ -187,6 +190,12 @@ class algo_vlan_reuse(object):
                                 tmp_vlan_list.append(self.vlan_id)
                                 self.resource_array[current_pm][6] = tmp_vlan_list
                             self.fragmentation = True
+                            if self.fragmentation == True and j==4 and i !=self.number_of_edegesw-1 :
+                                message='Here is a fragmentation across multiple edege switches, getting peregrine tree path'
+                                self.logger.info(message)
+                                core_switch=self.get_best_tree_path(1+i+self.number_of_ToRsw,2+i+self.number_of_ToRsw)
+                                self.resource_array[current_pm][8] = core_switch
+                                # Get peregrine tree path
                         else :
                             ##['edge_sw', 'number_of_pm', 'number_of_vm','pm', 'allocated_pm', 'allocated_vms', 'allocated_vlanids', 'available_vm', 'tagged_switches', 'available vlanids']
                             if self.fragmentation == False:
@@ -197,7 +206,7 @@ class algo_vlan_reuse(object):
                                 tmp.clear()
                                 tmp.append(self.vlan_id)
                             if j == 0: # This is just for prety printing
-                                self.resource_array[current_pm] = [i+1, self.number_of_pm, self.number_of_vm,j+1, 0, self.resource_array[current_pm][5] + self.tenant_req, tmp,  self.resource_array[current_pm][7] - self.tenant_req,0]
+                                self.resource_array[current_pm] = [1+i+self.number_of_ToRsw, self.number_of_pm, self.number_of_vm,j+1, 0, self.resource_array[current_pm][5] + self.tenant_req, tmp,  self.resource_array[current_pm][7] - self.tenant_req,0]
                             else:
                                 self.resource_array[current_pm] = ['', '', '',j+1, 0, self.resource_array[current_pm][5] + self.tenant_req, tmp,  self.resource_array[current_pm][7] - self.tenant_req,0]
                             self.tenant_req = 0
@@ -232,14 +241,52 @@ class algo_vlan_reuse(object):
 ########################################################################################################################
     ############### Peregrine controller methods ###############
 ########################################################################################################################
+    def get_best_tree_path(self,a,b):
+        edge_switch_1='172.0.0.'+str(a)
+        edge_switch_2='172.0.0.'+str(b)
+        switch_list = []
+        candidate_sw = []
+        self.fake_vlan_id = self.fake_vlan_id +1
+        for i in range (1,self.number_of_ToRsw,1):
+            self.add_user_input_vlan(edge_switch_1,self.fake_vlan_id)
+            self.add_user_input_vlan(edge_switch_2,self.fake_vlan_id)
+            self.calPrimaryTree()
+            candidate_sw = self.get_tree_path(self.fake_vlan_id)
+            candidate_sw.remove(edge_switch_1)
+            candidate_sw.remove(edge_switch_2)
+            switch_list.append(candidate_sw[0])
+            self.fake_vlan_id = self.fake_vlan_id + 1
+            candidate_sw.clear()
+        print(switch_list)
+        final_switch=random.choice(switch_list)
+        final_switch=[int((list(final_switch))[-1])]
+        print(final_switch)
+        message='Candidate switch from peregine tree path is '+str(final_switch)
+        self.logger.info(message)
+        return final_switch
+
+
+        core_sw=1
+        return core_sw
+
+    def calPrimaryTree(self):
+        request=self.peregrine_client_url+' dte calPrimaryTree glb'
+        os.system(request)
+
     def get_tree_path(self, vlan_id):
         null = None
         tree_path = []
-        tree_path_data = requests.get(self.tree_path_url+'/'+self.vlan_id,auth=('admin','admin'))
+        candidate_switch_list = []
+        req = self.tree_path_url+str(vlan_id)+' | jq .'
+        #tree_path_data = requests.get(req, auth=('admin','admin'))
+        req1="curl -Ss -X GET -H 'Accept: application/json' --user admin:admin http://127.0.0.1:8282/controller/nb/v3/peregrinedte/getPrimaryTree/"+str(vlan_id)+' | jq .'
+        tree_path_data = os.popen(req1).read()
+        tree_path_data = json.loads(tree_path_data)
+
         for x in range (len(tree_path_data['bulkRequest'])):
           tree_path.append(tree_path_data['bulkRequest'][x]['tailSwIp'])
         candidate_switch_list=list(dict.fromkeys(tree_path))
-        message="Peregrin tree path is "+candidate_switch_list
+        message="Peregrin tree path is "+str(candidate_switch_list)
         self.logger.info(message)
         return candidate_switch_list
 
@@ -297,9 +344,9 @@ class algo_vlan_reuse(object):
         response = os.system(command)
 
     def add_user_input_vlan(self, switch_ip, vlan_id):
-        request = 'http://127.0.0.1:8282/controller/nb/v3/peregrinepm/addUsrInputVLanOnEdgeSw'+'/'+str(vlan_id)+'/'+str(vlan_id)+'/'+str(switch_ip)
+        request = 'http://127.0.0.1:8282/controller/nb/v3/peregrinepm/addUsrInputVLanOnEdgeSw'+'/'+str(vlan_id)+'/'+str(vlan_id)+'/'+str(switch_ip)+'/5'
         response = requests.put(request,auth=('admin','admin'))
-        message='vlan {} added on edge switch {}'.format(vlan_id, switch_ip)
+        message='Fake vlan {} added on edge switch {}'.format(vlan_id, switch_ip)
         self.logger.info(message)
 
     def enable_peregrine_bundles(self):
@@ -361,7 +408,7 @@ if __name__ == '__main__':
         args = parser.parse_args()
 
         algo = algo_vlan_reuse(args.log, args.ToRsw, args.edege_sw, args.vm, args.pm )
-
+        # algo.build()
         #algo.initiate_tree_topology()
 
         algo.parse_vm_info()
@@ -374,4 +421,15 @@ if __name__ == '__main__':
         #algo.get_random_tenant_request()
         # core_sw,edge_sw=algo.get_user_input_switch()
         # print("core switches ",core_sw)
-        # print("edge switches ",edge_sw)
+        #print("edge switches ",edge_sw)
+
+        # a='172.0.0.5'
+        # b='172.0.0.6'
+        # algo.add_user_input_vlan(a,'105')
+        # algo.add_user_input_vlan(b,'105')
+
+        # algo.calPrimaryTree()
+        # res = algo.get_tree_path(111)
+        #
+        # print(res)
+        # print((set(res)- set(core_sw)))
