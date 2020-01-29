@@ -1,6 +1,6 @@
 # vlanid-reuse
 
-This work is sponcerd by ITRI research program
+This work is sponsored by ITRI research program
 
 Algorithm design and validation for efficient vlan id allocation. <br/>
 
